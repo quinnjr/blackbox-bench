@@ -96,9 +96,17 @@ def test_cli_profile_flag_emits_svg_when_pyspy_available(tmp_path):
 
 
 def test_cli_profile_flag_errors_if_pyspy_missing(tmp_path, monkeypatch):
+    # Windows Python's _Py_HashRandomization_Init requires PATH for some
+    # system DLLs; clearing it crashes the interpreter at startup before
+    # any of our code runs. The in-process equivalent in
+    # test_cli_unit.py::test_main_run_profile_without_pyspy_returns_2
+    # exercises the same py-spy-missing branch and works everywhere.
+    if sys.platform == "win32":
+        import pytest
+
+        pytest.skip("clearing PATH crashes the Windows Python interpreter")
     monkeypatch.setenv("PATH", "")
     _write_bench(tmp_path)
-    # Override PATH on the subprocess too
     env = {"PATH": ""}
     out = subprocess.run(
         [sys.executable, "-m", "pybench.cli",

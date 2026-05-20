@@ -194,6 +194,17 @@ mod tests {
     }
 
     #[test]
+    fn mad_flags_obvious_outlier() {
+        // 19 tightly-clustered samples plus one huge spike.
+        let mut xs: Vec<i64> = vec![10, 11, 9, 10, 12, 8, 10, 11, 9, 10, 12, 8, 9, 11, 10, 9, 11, 10, 12];
+        xs.push(10_000);
+        let mut s = Vec::new();
+        let (clean, n) = detect_outliers(&xs, OutlierMethod::Mad, &mut s);
+        assert!(n >= 1, "MAD should flag the 10_000 spike against a ~10 baseline");
+        assert!(clean < 20.0);
+    }
+
+    #[test]
     fn bootstrap_ci_contains_mean() {
         let mut rng = fastrand::Rng::with_seed(0xDEAD_BEEF);
         let xs: Vec<i64> = (0..1000).collect();

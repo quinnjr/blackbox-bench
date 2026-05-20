@@ -169,6 +169,67 @@ def test_main_compare_json_format_to_file(tmp_path, monkeypatch):
     assert "rows" in data
 
 
+def test_main_run_json_deprecated_alias(tmp_path, capsys, monkeypatch):
+    """`--json` is kept as a deprecated alias for `--format json`."""
+    _write_bench(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    rc = cli.main(["run", "bench_sample.py", "--warmup", "0", "--iterations", "3", "--json"])
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "deprecated" in captured.err.lower()
+    data = json.loads(captured.out)
+    assert data["results"][0]["name"] == "f"
+
+
+def test_discover_skips_files_that_fail_to_import(tmp_path, capsys, monkeypatch):
+    """A syntax error in one bench file must not abort discovery of the others."""
+    _write_bench(tmp_path)
+    (tmp_path / "bench_broken.py").write_text("this is not valid python =\n")
+    monkeypatch.chdir(tmp_path)
+
+    rc = cli.main(["run", str(tmp_path), "--warmup", "0", "--iterations", "3"])
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert "warning: skipping" in captured.err
+    assert "f" in captured.out  # the good benchmark still ran
+
+
+def test_main_run_profile_handles_pyspy_timeout(tmp_path, capsys, monkeypatch):
+    """If py-spy exceeds the timeout, we print and continue rather than hang."""
+    _write_bench(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/bin/py-spy")
+
+    def _raise_timeout(*args, **kwargs):
+        raise cli.subprocess.TimeoutExpired(cmd=args[0], timeout=300)
+
+    monkeypatch.setattr(cli.subprocess, "run", _raise_timeout)
+    rc = cli.main(["run", "bench_sample.py", "--warmup", "0", "--iterations", "2", "--profile"])
+    assert rc == 0
+    assert "timed out" in capsys.readouterr().err
+
+
+def test_main_run_profile_tolerates_harness_unlink_failure(tmp_path, capsys, monkeypatch):
+    """If the temp harness file can't be unlinked, --profile must still succeed."""
+    _write_bench(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/bin/py-spy")
+    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: None)
+
+    real_unlink = cli.os.unlink
+
+    def _raise_unlink(path):
+        raise OSError("simulated unlink failure")
+
+    monkeypatch.setattr(cli.os, "unlink", _raise_unlink)
+    try:
+        rc = cli.main(["run", "bench_sample.py", "--warmup", "0", "--iterations", "2", "--profile"])
+    finally:
+        # cleanup the leaked temp harness ourselves
+        monkeypatch.setattr(cli.os, "unlink", real_unlink)
+    assert rc == 0
+
+
 def test_main_run_target_time_ns_kwarg(tmp_path, capsys, monkeypatch):
     _write_bench(tmp_path)
     monkeypatch.chdir(tmp_path)

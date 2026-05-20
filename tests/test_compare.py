@@ -206,31 +206,6 @@ def test_comparison_report_format_empty():
     assert "No benchmarks to compare" in report.format("table")
 
 
-def test_compare_mad_outlier_detected():
-    """Ensures the MAD outlier branch (stats.rs line 92) is executed."""
-    runner = pybench.Runner(
-        warmup=0, iterations=20, target_time_ns=10_000_000,
-        outlier_method="mad", overhead_subtract=False, seed=42,
-    )
-
-    # A function that has wildly variable timing so MAD threshold is large
-    # and some samples exceed it.
-    import time
-
-    state = {"n": 0}
-
-    def jittery():
-        state["n"] += 1
-        if state["n"] % 7 == 0:
-            time.sleep(0.0005)  # occasional spike
-
-    r = runner.run("mad_outlier", jittery)
-    assert r.iterations == 20
-    # The 500µs spikes against a sub-µs baseline are far outside any
-    # reasonable MAD threshold; at least one outlier must be detected.
-    assert r.outliers > 0
-
-
 def test_diff_row_attributes():
     report = _make_report()
     by_name = {r.name: r for r in report.rows}

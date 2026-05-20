@@ -101,6 +101,19 @@ def test_module_level_benchmark_parenthesised_no_args():
     assert any(name == "k" for name, _, _ in pybench._bench._global_registry)
 
 
+def test_module_level_benchmark_explicit_kwargs():
+    """The module-level @benchmark forwards each named kwarg into opts."""
+    pybench._bench._global_registry.clear()
+
+    @pybench.benchmark(iterations=5, warmup=2, throughput=1024.0, params=[1, 2])
+    def m():
+        pass
+
+    name, _fn, opts = pybench._bench._global_registry[-1]
+    assert name == "m"
+    assert opts == {"iterations": 5, "warmup": 2, "throughput": 1024.0, "params": [1, 2]}
+
+
 def test_to_table_auto_runs_when_not_yet_run():
     bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
 

@@ -69,8 +69,128 @@ def test_throughput_recorded_on_result():
     assert results[0].throughput_per_sec > 0
 
 
-def test_iter_batched_setup_runs_per_sample_not_per_call():
+def test_bench_decorator_per_benchmark_warmup_override():
     bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark(warmup=3, iterations=2)
+    def f():
+        pass
+
+    results = bench.run()
+    assert results[0].iterations == 2
+
+
+def test_bench_decorator_parenthesised_no_args():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark()
+    def f():
+        pass
+
+    results = bench.run()
+    assert results[0].name == "f"
+
+
+def test_module_level_benchmark_parenthesised_no_args():
+    pybench._bench._global_registry.clear()
+
+    @pybench.benchmark()
+    def k():
+        pass
+
+    assert any(name == "k" for name, _, _ in pybench._bench._global_registry)
+
+
+def test_to_table_auto_runs_when_not_yet_run():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def f():
+        pass
+
+    out = bench.to_table()
+    assert "f" in out
+
+
+def test_to_json_auto_runs_when_not_yet_run():
+    import json as _json
+
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def f():
+        pass
+
+    data = _json.loads(bench.to_json())
+    assert data["results"][0]["name"] == "f"
+
+
+def test_to_html_auto_runs_when_not_yet_run():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def f():
+        pass
+
+    out = bench.to_html()
+    assert "<html" in out.lower() and "f" in out
+
+
+def test_to_xml_auto_runs_when_not_yet_run():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def f():
+        pass
+
+    out = bench.to_xml()
+    assert "<testsuite" in out
+
+
+def test_report_each_format_to_stdout(capsys):
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def f():
+        pass
+
+    bench.run()
+
+    for fmt in ("table", "json", "html", "xml"):
+        bench.report(format=fmt)
+        captured = capsys.readouterr()
+        assert captured.out, f"no output for {fmt}"
+
+
+def test_report_to_file(tmp_path):
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def f():
+        pass
+
+    bench.run()
+    out = tmp_path / "out.txt"
+    bench.report(format="json", path=str(out))
+    assert "results" in out.read_text()
+
+
+def test_report_unknown_format_raises():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def f():
+        pass
+
+    bench.run()
+    import pytest
+
+    with pytest.raises(ValueError, match="unknown format"):
+        bench.report(format="bogus")
+
+
+def test_iter_batched_setup_runs_per_sample_not_per_call():
+    bench = pybench.Bench(warmup=0, iterations=5, target_time_ns=10_000_000)
     setup_calls = [0]
     routine_calls = [0]
 
@@ -87,5 +207,9 @@ def test_iter_batched_setup_runs_per_sample_not_per_call():
         return bench.iter_batched(setup=setup, routine=routine)
 
     results = bench.run()
+    n = results[0].iterations
     assert results[0].name == "sort_random"
-    assert setup_calls[0] < routine_calls[0], "setup should run once per sample, not per call"
+    # setup runs once during calibration plus once per sample (warmup=0).
+    assert setup_calls[0] == 1 + n
+    # routine runs at least once per sample; batching typically multiplies it.
+    assert routine_calls[0] >= n

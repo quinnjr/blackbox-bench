@@ -61,10 +61,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
         text = bench.to_json()
     elif args.format == "html":
         text = bench.to_html()
-    elif args.format == "xml":
-        text = bench.to_xml(style=args.xml_style)
     else:
-        raise SystemExit(f"unknown format: {args.format}")
+        text = bench.to_xml(style=args.xml_style)
 
     if args.output:
         Path(args.output).write_text(text)
@@ -115,10 +113,8 @@ def main(argv: list[str] | None = None) -> int:
     args = p.parse_args(argv)
     if args.command == "run":
         return _cmd_run(args)
-    if args.command == "compare":
-        return _cmd_compare(args)
-    return 1
+    return _cmd_compare(args)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

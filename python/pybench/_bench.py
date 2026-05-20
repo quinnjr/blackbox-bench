@@ -53,7 +53,6 @@ class Bench:
         warmup: int | None = None,
         throughput: float | None = None,
         params: list[Any] | None = None,
-        setup: Callable[[], Any] | None = None,
     ):
         opts: dict[str, Any] = {}
         if iterations is not None:
@@ -64,8 +63,6 @@ class Bench:
             opts["throughput"] = throughput
         if params is not None:
             opts["params"] = params
-        if setup is not None:
-            opts["setup"] = setup
 
         def register(f: Callable[..., Any]) -> Callable[..., Any]:
             self._registered.append((name or f.__name__, f, opts))

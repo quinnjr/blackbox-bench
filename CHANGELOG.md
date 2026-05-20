@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-05-20
+
+First stable release of the Rust-core rewrite. Folds in everything from the `1.0.0a1` pre-release plus the post-alpha hardening (dependency bumps, perf wins, security fixes, and review feedback). Drop-in for `1.0.0a1`; users who installed the alpha can upgrade with no code changes.
+
 ### Added
 - `CLAUDE.md` — build, test, and architecture notes for Claude Code working in the repo.
 - Expanded `README.md` with quick-start, feature overview, and CLI usage.
@@ -82,6 +86,7 @@ Major rewrite. The core moves from pure Python to a Rust crate exposed via PyO3.
 
 Initial pure-Python release. `Bench` class with `@benchmark` decorator and `measure()` context manager; `Runner` with warmup + auto-calibration; mean / median / stddev / min / max stats; table and JSON reporters; `pybench run` / `pybench compare` CLI. Zero required runtime dependencies.
 
-[Unreleased]: https://github.com/quinnjr/pybench/compare/v1.0.0a1...develop
+[Unreleased]: https://github.com/quinnjr/pybench/compare/v1.0.0...develop
+[1.0.0]: https://github.com/quinnjr/pybench/compare/v1.0.0a1...v1.0.0
 [1.0.0a1]: https://github.com/quinnjr/pybench/compare/v0.1.0...v1.0.0a1
 [0.1.0]: https://github.com/quinnjr/pybench/releases/tag/v0.1.0

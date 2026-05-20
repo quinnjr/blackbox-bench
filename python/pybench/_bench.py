@@ -23,7 +23,7 @@ _global_registry: list[tuple[str, Callable[..., Any], dict[str, Any]]] = []
 # every to_json()/to_html() call doesn't pay platform-module lookup costs.
 _PYTHON_VERSION = platform.python_version()
 _PLATFORM_SYSTEM = platform.system()
-_PYBENCH_VERSION = "1.0.0a1"
+_PYBENCH_VERSION = "1.0.0"
 
 
 class Bench:

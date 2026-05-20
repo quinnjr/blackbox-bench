@@ -7,6 +7,11 @@ use pyo3::types::PyTuple;
 use crate::histogram::HdrHistogram;
 use crate::stats::{self, OutlierMethod};
 
+/// `PyObject` was removed from pyo3::prelude in 0.28 in favour of `Py<PyAny>`.
+/// Keep the short alias locally so the existing field/parameter declarations
+/// don't need a sweeping rename.
+type PyObject = Py<PyAny>;
+
 const MIN_BATCH_TIME_NS: u128 = 5_000; // 5µs per batch minimum
 const DEFAULT_TARGET_TIME_NS: u64 = 1_000_000_000; // 1s budget
 const BOOTSTRAP_RESAMPLES: usize = 10_000;
@@ -52,7 +57,7 @@ pub struct BenchmarkResult {
 #[pymethods]
 impl BenchmarkResult {
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyDict>> {
-        let d = pyo3::types::PyDict::new_bound(py);
+        let d = pyo3::types::PyDict::new(py);
         d.set_item("name", &self.name)?;
         d.set_item("iterations", self.iterations)?;
         d.set_item("batch_size", self.batch_size)?;
@@ -101,7 +106,7 @@ impl BenchmarkResult {
         // 10,000 × N inner iterations of pure Rust, blocking any other Python
         // thread until it returns.
         let (mean_ns, median_ns, stddev_ns, min_ns, max_ns, clean_mean_ns, outliers,
-             ci95_low_ns, ci95_high_ns) = py.allow_threads(|| {
+             ci95_low_ns, ci95_high_ns) = py.detach(|| {
             let mean_ns = stats::mean(&times_ns);
             let median_ns = stats::median(&times_ns, samples_scratch);
             let stddev_ns = stats::stddev(&times_ns);
@@ -315,7 +320,7 @@ impl Runner {
         let mut times = Vec::with_capacity(iters);
         for _ in 0..iters {
             let state = setup.call0(py)?;
-            let args = PyTuple::new_bound(py, [state]);
+            let args = PyTuple::new(py, [state])?;
             let routine_ptr = routine.as_ptr();
             let args_ptr = args.as_ptr();
             let start = Instant::now();
@@ -395,7 +400,7 @@ impl Runner {
         routine: &PyObject,
     ) -> PyResult<(usize, u128)> {
         let state = setup.call0(py)?;
-        let args = PyTuple::new_bound(py, [state]);
+        let args = PyTuple::new(py, [state])?;
         let mut batch: usize = 1;
         loop {
             let start = Instant::now();
@@ -418,7 +423,7 @@ fn call_routine_batch(
     state: PyObject,
     batch_size: usize,
 ) -> PyResult<()> {
-    let args = PyTuple::new_bound(py, [state]);
+    let args = PyTuple::new(py, [state])?;
     call_routine_batch_ptr(py, routine.as_ptr(), args.as_ptr(), batch_size)
 }
 
@@ -478,7 +483,7 @@ pub fn run_batch(py: Python<'_>, fn_: &PyObject, batch_size: usize) -> PyResult<
 }
 
 fn measure_overhead(py: Python<'_>) -> PyResult<f64> {
-    let noop = py.eval_bound("(lambda: None)", None, None)?;
+    let noop = py.eval(c"(lambda: None)", None, None)?;
     let noop_obj: PyObject = noop.into();
     let mut samples = Vec::with_capacity(50);
     for _ in 0..50 {

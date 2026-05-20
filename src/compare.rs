@@ -92,7 +92,7 @@ pub fn compare(
             current_json.len(),
         )));
     }
-    let json_mod = py.import_bound("json")?;
+    let json_mod = py.import("json")?;
     let loads = json_mod.getattr("loads")?;
     let baseline = loads
         .call1((baseline_json,))
@@ -156,17 +156,17 @@ pub fn compare(
 
 fn extract_rows(payload: &Bound<'_, PyAny>) -> PyResult<Vec<ResultRow>> {
     let results = payload
-        .downcast::<PyDict>()
+        .cast::<PyDict>()
         .map_err(|_| pyo3::exceptions::PyValueError::new_err("payload is not a JSON object"))?
         .get_item("results")?
         .ok_or_else(|| pyo3::exceptions::PyValueError::new_err("missing 'results' key"))?;
     let arr: Bound<'_, PyList> = results
-        .downcast_into()
+        .cast_into()
         .map_err(|_| pyo3::exceptions::PyValueError::new_err("'results' is not an array"))?;
     let mut out = Vec::with_capacity(arr.len());
     for item in arr.iter() {
         let d: Bound<'_, PyDict> = item
-            .downcast_into()
+            .cast_into()
             .map_err(|_| pyo3::exceptions::PyValueError::new_err("result row is not an object"))?;
         let name: String = d
             .get_item("name")?

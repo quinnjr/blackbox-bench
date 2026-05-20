@@ -256,6 +256,21 @@ impl Runner {
     }
 }
 
+#[pyfunction]
+pub fn _synthesize(name: String, elapsed_ns: i64) -> BenchmarkResult {
+    let mut rng = fastrand::Rng::with_seed(0);
+    BenchmarkResult::from_times(
+        name,
+        vec![elapsed_ns],
+        1,
+        0.95,
+        OutlierMethod::None,
+        None,
+        None,
+        &mut rng,
+    )
+}
+
 pub fn run_batch(py: Python<'_>, fn_: &PyObject, batch_size: usize) -> PyResult<u128> {
     let start = Instant::now();
     for _ in 0..batch_size {

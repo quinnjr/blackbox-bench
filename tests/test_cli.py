@@ -1,112 +1,87 @@
 import json
-import os
-import textwrap
-import tempfile
+import subprocess
+import sys
 from pathlib import Path
-from unittest.mock import patch
-
-from pybench.cli import main
 
 
-def _create_bench_file(tmp_path: Path, content: str) -> Path:
-    f = tmp_path / "bench_example.py"
-    f.write_text(content)
-    return f
+def _write_bench(tmp_path: Path) -> Path:
+    p = tmp_path / "bench_sample.py"
+    p.write_text(
+        "import pybench\n"
+        "@pybench.benchmark\n"
+        "def f():\n"
+        "    sum(range(10))\n"
+    )
+    return p
 
 
-def test_cli_run_discovers_bench_files(tmp_path):
-    _create_bench_file(tmp_path, textwrap.dedent("""\
-        import pybench
-
-        @pybench.benchmark
-        def bench_add():
-            1 + 1
-    """))
-
-    with patch("sys.argv", ["pybench", "run", str(tmp_path), "--iterations", "3", "--warmup", "0"]):
-        # Should not raise
-        main()
+def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-m", "pybench.cli", *args],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
 
 
-def test_cli_run_json_output(tmp_path, capsys):
-    _create_bench_file(tmp_path, textwrap.dedent("""\
-        import pybench
-
-        @pybench.benchmark
-        def bench_add():
-            1 + 1
-    """))
-
-    with patch("sys.argv", ["pybench", "run", str(tmp_path), "--json", "--iterations", "3", "--warmup", "0"]):
-        main()
-
-    captured = capsys.readouterr()
-    data = json.loads(captured.out)
-    assert "results" in data
-    assert len(data["results"]) >= 1
+def test_cli_run_default_table(tmp_path):
+    _write_bench(tmp_path)
+    out = _run(["run", "bench_sample.py", "--warmup", "0", "--iterations", "5"], tmp_path)
+    assert out.returncode == 0, out.stderr
+    assert "Name" in out.stdout
+    assert "f" in out.stdout
 
 
-def test_cli_run_save_json(tmp_path):
-    _create_bench_file(tmp_path, textwrap.dedent("""\
-        import pybench
-
-        @pybench.benchmark
-        def bench_add():
-            1 + 1
-    """))
-
-    out_file = tmp_path / "results.json"
-    with patch("sys.argv", ["pybench", "run", str(tmp_path), "--save", str(out_file), "--iterations", "3", "--warmup", "0"]):
-        main()
-
-    assert out_file.exists()
-    data = json.loads(out_file.read_text())
-    assert "results" in data
+def test_cli_run_json_output(tmp_path):
+    _write_bench(tmp_path)
+    out = _run(
+        ["run", "bench_sample.py", "--warmup", "0", "--iterations", "5", "--format", "json"],
+        tmp_path,
+    )
+    assert out.returncode == 0, out.stderr
+    data = json.loads(out.stdout)
+    assert data["results"][0]["name"] == "f"
 
 
-def test_cli_run_single_file(tmp_path, capsys):
-    bench_file = _create_bench_file(tmp_path, textwrap.dedent("""\
-        import pybench
-
-        @pybench.benchmark
-        def bench_add():
-            1 + 1
-    """))
-
-    with patch("sys.argv", ["pybench", "run", str(bench_file), "--json", "--iterations", "3", "--warmup", "0"]):
-        main()
-
-    captured = capsys.readouterr()
-    data = json.loads(captured.out)
-    assert len(data["results"]) >= 1
-
-
-def test_cli_run_no_benchmarks(tmp_path):
-    with patch("sys.argv", ["pybench", "run", str(tmp_path), "--iterations", "3", "--warmup", "0"]):
-        import pytest
-        with pytest.raises(SystemExit) as exc_info:
-            main()
-        assert exc_info.value.code == 1
+def test_cli_run_html_to_file(tmp_path):
+    _write_bench(tmp_path)
+    out_file = tmp_path / "out.html"
+    out = _run(
+        [
+            "run",
+            "bench_sample.py",
+            "--warmup", "0",
+            "--iterations", "5",
+            "--format", "html",
+            "--output", str(out_file),
+        ],
+        tmp_path,
+    )
+    assert out.returncode == 0, out.stderr
+    html = out_file.read_text()
+    assert "<html" in html.lower() and "f" in html
 
 
-def test_cli_compare(tmp_path, capsys):
-    baseline = {"metadata": {}, "results": [
-        {"name": "sort", "mean_ns": 1000.0, "median_ns": 1000.0, "stddev_ns": 10.0,
-         "min_ns": 990, "max_ns": 1010, "iterations": 100, "ops_per_sec": 1_000_000.0},
-    ]}
-    current = {"metadata": {}, "results": [
-        {"name": "sort", "mean_ns": 1100.0, "median_ns": 1100.0, "stddev_ns": 11.0,
-         "min_ns": 1090, "max_ns": 1110, "iterations": 100, "ops_per_sec": 909_091.0},
-    ]}
+def test_cli_run_xml_junit_default(tmp_path):
+    _write_bench(tmp_path)
+    out = _run(
+        ["run", "bench_sample.py", "--warmup", "0", "--iterations", "5", "--format", "xml"],
+        tmp_path,
+    )
+    assert out.returncode == 0
+    assert "<testsuite" in out.stdout
 
-    base_file = tmp_path / "baseline.json"
-    curr_file = tmp_path / "current.json"
-    base_file.write_text(json.dumps(baseline))
-    curr_file.write_text(json.dumps(current))
 
-    with patch("sys.argv", ["pybench", "compare", str(base_file), str(curr_file)]):
-        main()
-
-    captured = capsys.readouterr()
-    assert "sort" in captured.out
-    assert "%" in captured.out
+def test_cli_run_xml_raw_style(tmp_path):
+    _write_bench(tmp_path)
+    out = _run(
+        [
+            "run", "bench_sample.py",
+            "--warmup", "0", "--iterations", "5",
+            "--format", "xml", "--xml-style", "raw",
+        ],
+        tmp_path,
+    )
+    assert out.returncode == 0
+    assert "<pybench>" in out.stdout

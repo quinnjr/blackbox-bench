@@ -214,8 +214,9 @@ def test_compare_mad_outlier_detected():
 
     r = runner.run("mad_outlier", jittery)
     assert r.iterations == 20
-    # We're not strict about how many outliers, just that the field is set
-    assert r.outliers >= 0
+    # The 500µs spikes against a sub-µs baseline are far outside any
+    # reasonable MAD threshold; at least one outlier must be detected.
+    assert r.outliers > 0
 
 
 def test_diff_row_attributes():

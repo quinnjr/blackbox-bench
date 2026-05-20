@@ -274,8 +274,11 @@ def test_iter_batched_setup_runs_per_sample_not_per_call():
 
     results = bench.run()
     n = results[0].iterations
+    batch = results[0].batch_size
     assert results[0].name == "sort_random"
     # setup runs once during calibration plus once per sample (warmup=0).
     assert setup_calls[0] == 1 + n
-    # routine runs at least once per sample; batching typically multiplies it.
-    assert routine_calls[0] >= n
+    # routine runs `batch_size` times per sample plus the doubling sequence
+    # during calibration (1+2+4+...+batch = 2*batch - 1).
+    expected_routine_calls = n * batch + (2 * batch - 1)
+    assert routine_calls[0] == expected_routine_calls

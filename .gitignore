@@ -10,4 +10,5 @@ target/
 .coverage
 *.profraw
 htmlcov/
+.claude/
 

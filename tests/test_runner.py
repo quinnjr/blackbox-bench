@@ -79,15 +79,17 @@ def test_runner_invalid_outlier_method_raises():
         pybench.Runner(warmup=0, iterations=3, outlier_method="bogus")
 
 
-def test_runner_iterations_none_uses_estimate():
+def test_runner_iterations_none_uses_target_time_budget():
+    """iterations=None should auto-estimate samples to fit target_time_ns."""
+    # 5ms budget with calibration's 5µs minimum batch => somewhere in [10, ~1000]
     runner = pybench.Runner(warmup=0, target_time_ns=5_000_000)
 
     def noop():
         pass
 
     r = runner.run("auto_iters", noop)
-    # estimate_iters currently returns 100; assert it's the default value
-    assert r.iterations == 100
+    assert r.iterations >= 10
+    assert r.iterations <= 100_000
 
 
 def test_runner_iter_batched_returns_result():

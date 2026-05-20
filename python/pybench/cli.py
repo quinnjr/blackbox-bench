@@ -27,9 +27,19 @@ def _discover(path: Path) -> list[tuple[str, callable, dict]]:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    if args.json:
+        print(
+            "warning: --json is deprecated; use --format json (removed in v1.1)",
+            file=sys.stderr,
+        )
+        args.format = "json"
     benchmarks = _discover(Path(args.path))
     if not benchmarks:
-        print("No benchmarks found.", file=sys.stderr)
+        print(
+            f"No benchmarks found in '{args.path}' "
+            f"(searched for bench_*.py and *_bench.py).",
+            file=sys.stderr,
+        )
         return 1
     if args.profile:
         if not shutil.which("py-spy"):
@@ -45,7 +55,10 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 f"m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);"
                 f"m.{name}()",
             ]
-            subprocess.run(cmd, check=False)
+            try:
+                subprocess.run(cmd, check=False, timeout=300)
+            except subprocess.TimeoutExpired:
+                print(f"py-spy timed out (>300s) profiling {name}", file=sys.stderr)
     bench = Bench(
         warmup=args.warmup,
         target_time_ns=args.target_time_ns,
@@ -89,6 +102,9 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--save", default=None, help="Write JSON results to file (in addition to --output)")
     r.add_argument("--profile", action="store_true",
                    help="Wrap each benchmark in py-spy and emit SVG flamegraphs")
+    # Deprecated v0.1.0 alias for --format json
+    r.add_argument("--json", action="store_true",
+                   help=argparse.SUPPRESS)
 
     c = sub.add_parser("compare")
     c.add_argument("baseline")

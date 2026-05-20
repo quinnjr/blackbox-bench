@@ -250,11 +250,11 @@ impl Runner {
         throughput: Option<f64>,
         param: Option<PyObject>,
     ) -> PyResult<BenchmarkResult> {
-        let batch_size = self.calibrate(py, &fn_)?;
+        let (batch_size, batch_elapsed) = self.calibrate(py, &fn_)?;
         for _ in 0..self.warmup {
             run_batch(py, &fn_, batch_size)?;
         }
-        let iters = self.iterations.unwrap_or_else(|| self.estimate_iters(batch_size));
+        let iters = self.iterations.unwrap_or_else(|| self.estimate_iters(batch_elapsed));
         let mut times = Vec::with_capacity(iters);
         for _ in 0..iters {
             let elapsed = run_batch(py, &fn_, batch_size)?;
@@ -301,12 +301,12 @@ impl Runner {
         throughput: Option<f64>,
         param: Option<PyObject>,
     ) -> PyResult<BenchmarkResult> {
-        let batch_size = self.calibrate_batched(py, &setup, &routine)?;
+        let (batch_size, batch_elapsed) = self.calibrate_batched(py, &setup, &routine)?;
         for _ in 0..self.warmup {
             let state = setup.call0(py)?;
             call_routine_batch(py, &routine, state, batch_size)?;
         }
-        let iters = self.iterations.unwrap_or_else(|| self.estimate_iters(batch_size));
+        let iters = self.iterations.unwrap_or_else(|| self.estimate_iters(batch_elapsed));
         let mut times = Vec::with_capacity(iters);
         for _ in 0..iters {
             let state = setup.call0(py)?;
@@ -360,7 +360,7 @@ impl Runner {
 }
 
 impl Runner {
-    fn calibrate(&self, py: Python<'_>, fn_: &PyObject) -> PyResult<usize> {
+    fn calibrate(&self, py: Python<'_>, fn_: &PyObject) -> PyResult<(usize, u128)> {
         // The loop is bounded: a fn that took less than 5µs per call at batch=2^62
         // would have to be physically impossible (sub-attosecond), so we don't
         // guard the multiplication.
@@ -368,14 +368,19 @@ impl Runner {
         loop {
             let elapsed = run_batch(py, fn_, batch)?;
             if elapsed >= MIN_BATCH_TIME_NS {
-                return Ok(batch);
+                return Ok((batch, elapsed));
             }
             batch *= 2;
         }
     }
 
-    fn estimate_iters(&self, _batch_size: usize) -> usize {
-        100
+    /// Estimate how many samples fit inside `target_time_ns`, given the
+    /// observed per-batch elapsed from calibration. Clamped to [MIN, MAX].
+    fn estimate_iters(&self, batch_elapsed_ns: u128) -> usize {
+        const MIN_ITERS: usize = 10;
+        const MAX_ITERS: usize = 100_000;
+        let estimated = self.target_time_ns / batch_elapsed_ns.max(1);
+        (estimated as usize).clamp(MIN_ITERS, MAX_ITERS)
     }
 
     fn calibrate_batched(
@@ -383,7 +388,7 @@ impl Runner {
         py: Python<'_>,
         setup: &PyObject,
         routine: &PyObject,
-    ) -> PyResult<usize> {
+    ) -> PyResult<(usize, u128)> {
         let state = setup.call0(py)?;
         let args = PyTuple::new_bound(py, [state]);
         let mut batch: usize = 1;
@@ -392,7 +397,7 @@ impl Runner {
             call_routine_batch_ptr(py, routine.as_ptr(), args.as_ptr(), batch)?;
             let elapsed = start.elapsed().as_nanos();
             if elapsed >= MIN_BATCH_TIME_NS {
-                return Ok(batch);
+                return Ok((batch, elapsed));
             }
             batch *= 2;
         }

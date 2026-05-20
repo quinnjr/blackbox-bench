@@ -131,16 +131,21 @@ pub fn bootstrap_ci_mean(
     means_scratch.clear();
     means_scratch.reserve(n_resamples);
     for _ in 0..n_resamples {
-        let mut sum: i64 = 0;
+        // i128 accumulator: a single u64 sum could plausibly approach i64::MAX
+        // for very long benchmarks (e.g. 10^9 ns × 10^9 samples). i128 has
+        // headroom for any realistic timing run.
+        let mut sum: i128 = 0;
         for _ in 0..n {
-            sum += xs[rng.usize(..n)];
+            sum += xs[rng.usize(..n)] as i128;
         }
         means_scratch.push(sum as f64 / n as f64);
     }
     let alpha = (1.0 - level) / 2.0;
     let lo_idx = (alpha * n_resamples as f64) as usize;
     let hi_idx = (((1.0 - alpha) * n_resamples as f64) as usize).min(n_resamples - 1);
-    let cmp = |a: &f64, b: &f64| a.partial_cmp(b).unwrap();
+    // total_cmp is NaN-safe; partial_cmp().unwrap() would panic if any mean
+    // ever ended up NaN.
+    let cmp = |a: &f64, b: &f64| a.total_cmp(b);
     let (_, lo, _) = means_scratch.select_nth_unstable_by(lo_idx, cmp);
     let lo_value = *lo;
     let (_, hi, _) = means_scratch.select_nth_unstable_by(hi_idx, cmp);

@@ -181,11 +181,30 @@ class Bench:
 def benchmark(
     fn: Callable[..., Any] | None = None,
     /,
-    **opts: Any,
+    *,
+    name: str | None = None,
+    iterations: int | None = None,
+    warmup: int | None = None,
+    throughput: float | None = None,
+    params: list[Any] | None = None,
 ):
-    """Module-level decorator that registers into the global registry."""
+    """Module-level decorator that registers into the global registry.
+
+    Mirrors `Bench.benchmark`'s named kwargs so type checkers can catch
+    typos and so the two surfaces stay in sync.
+    """
+    opts: dict[str, Any] = {}
+    if iterations is not None:
+        opts["iterations"] = iterations
+    if warmup is not None:
+        opts["warmup"] = warmup
+    if throughput is not None:
+        opts["throughput"] = throughput
+    if params is not None:
+        opts["params"] = params
+
     def register(f: Callable[..., Any]) -> Callable[..., Any]:
-        _global_registry.append((opts.get("name") or f.__name__, f, opts))
+        _global_registry.append((name or f.__name__, f, opts))
         return f
 
     if fn is not None:

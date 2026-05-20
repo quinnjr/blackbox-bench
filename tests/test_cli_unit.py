@@ -122,16 +122,24 @@ def test_main_run_profile_without_pyspy_returns_2(tmp_path, capsys, monkeypatch)
 
 
 def test_main_run_profile_with_pyspy_invokes_subprocess(tmp_path, capsys, monkeypatch):
-    """When py-spy IS available, the profile branch shells out to it. We stub
-    shutil.which and subprocess.run to exercise the loop without needing the real binary."""
+    """When py-spy IS available, the profile branch shells out to it with a
+    record subcommand, an output flag, and the benchmark's SVG filename."""
     _write_bench(tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli.shutil, "which", lambda name: "/usr/bin/py-spy" if name == "py-spy" else None)
     calls: list[list[str]] = []
-    monkeypatch.setattr(cli.subprocess, "run", lambda cmd, check=False: calls.append(cmd) or None)
+    monkeypatch.setattr(
+        cli.subprocess, "run",
+        lambda cmd, check=False, timeout=None: calls.append(cmd) or None,
+    )
     rc = cli.main(["run", "bench_sample.py", "--warmup", "0", "--iterations", "2", "--profile"])
     assert rc == 0
-    assert any("py-spy" in c[0] for c in calls)
+    # Exactly one py-spy invocation per registered benchmark (here: "f").
+    assert len(calls) == 1
+    cmd = calls[0]
+    assert cmd[0:3] == ["py-spy", "record", "-o"]
+    assert cmd[3] == "f.svg"
+    assert "--" in cmd
 
 
 def test_main_compare_default_table_to_stdout(tmp_path, capsys, monkeypatch):

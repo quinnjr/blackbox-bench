@@ -148,6 +148,16 @@ def test_compare_payload_not_object_raises():
         pybench.compare("[]", json.dumps({"results": []}))
 
 
+def test_compare_rejects_oversized_input():
+    import pytest
+
+    huge = "a" * (51 * 1024 * 1024)  # 51 MB, just over the 50 MB cap
+    with pytest.raises(ValueError, match="exceeds.*limit"):
+        pybench.compare(huge, json.dumps({"results": []}))
+    with pytest.raises(ValueError, match="current.*exceeds"):
+        pybench.compare(json.dumps({"results": []}), huge)
+
+
 def test_compare_error_identifies_baseline_vs_current():
     import pytest
 

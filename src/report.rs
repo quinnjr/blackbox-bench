@@ -99,10 +99,12 @@ fn html_escape(s: &str) -> String {
 }
 
 fn sparkline_svg(samples: &[i64]) -> String {
-    // Caller always passes a populated samples slice — Runner.run only emits a
-    // BenchmarkResult after at least one sample, and the HTML reporter only
-    // sees BenchmarkResults from Runner.
-    debug_assert!(!samples.is_empty());
+    // In normal use `samples` is non-empty (Runner emits a BenchmarkResult only
+    // after at least one sample). Handle the empty case defensively rather than
+    // relying on a release-stripped debug_assert.
+    if samples.is_empty() {
+        return String::new();
+    }
     let width: usize = 120;
     let height: usize = 30;
     let bins = 24usize;

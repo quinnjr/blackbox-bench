@@ -40,6 +40,11 @@ jobs:
   publish:
     needs: build-wheels
     runs-on: ubuntu-latest
+    # PyPI trusted publishing requires an OIDC token; the action will fail
+    # without this permission and fall back to needing a long-lived API token.
+    permissions:
+      id-token: write
+    environment: pypi
     steps:
       - uses: actions/download-artifact@v4
         with:

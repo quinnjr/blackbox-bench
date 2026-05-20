@@ -136,6 +136,13 @@ def test_benchmark_result_to_dict_round_trip():
     assert d["name"] == "dict_test"
     assert d["iterations"] == 3
     assert d["param"] is None
+    # v0.1.0 to_dict() excluded the (potentially large) times_ns list to keep
+    # dict-based serialisation cheap. Lock that in so a future helper accident
+    # doesn't quietly start including it.
+    assert "times_ns" not in d
+    # times_ns is still accessible as an attribute.
+    assert isinstance(r.times_ns, list)
+    assert len(r.times_ns) == 3
 
 
 def test_runner_respects_warmup():

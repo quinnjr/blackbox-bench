@@ -66,12 +66,32 @@ struct ResultRow {
     ci_high: f64,
 }
 
+/// Cap the JSON input at a reasonable size so a malicious or runaway
+/// pybench-results file can't OOM the host via Python's json.loads. 50 MB is
+/// comfortably above any realistic pybench result payload (millions of
+/// benchmarks would be required to approach it).
+const MAX_JSON_INPUT_BYTES: usize = 50 * 1024 * 1024;
+
 #[pyfunction]
 pub fn compare(
     py: Python<'_>,
     baseline_json: &str,
     current_json: &str,
 ) -> PyResult<ComparisonReport> {
+    if baseline_json.len() > MAX_JSON_INPUT_BYTES {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "baseline JSON exceeds {} MB limit ({} bytes)",
+            MAX_JSON_INPUT_BYTES / (1024 * 1024),
+            baseline_json.len(),
+        )));
+    }
+    if current_json.len() > MAX_JSON_INPUT_BYTES {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "current JSON exceeds {} MB limit ({} bytes)",
+            MAX_JSON_INPUT_BYTES / (1024 * 1024),
+            current_json.len(),
+        )));
+    }
     let json_mod = py.import_bound("json")?;
     let loads = json_mod.getattr("loads")?;
     let baseline = loads
@@ -98,6 +118,9 @@ pub fn compare(
             },
             Some(c) => {
                 let pct = (c.mean_ns - b.mean_ns) / b.mean_ns * 100.0;
+                // Strict inequalities: touching CIs (e.g. c.ci_low == b.ci_high)
+                // classify as "unchanged" — the regions kiss but do not overlap,
+                // which we treat as too borderline to call a regression.
                 let cls = if c.ci_low > b.ci_high {
                     "regressed"
                 } else if c.ci_high < b.ci_low {

@@ -1,12 +1,9 @@
 use pyo3::prelude::*;
 
-#[pyfunction]
-fn _hello() -> &'static str {
-    "pybench v1.0"
-}
+mod black_box;
 
 #[pymodule]
 fn _pybench(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(_hello, m)?)?;
+    m.add_function(wrap_pyfunction!(black_box::black_box, m)?)?;
     Ok(())
 }

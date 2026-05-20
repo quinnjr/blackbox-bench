@@ -124,7 +124,11 @@ def test_xml_escape_special_chars_in_name():
 
 
 def test_json_includes_throughput_when_set():
-    bench = pybench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000)
+    # overhead_subtract=False so the tiny benchmark isn't zeroed out (which
+    # would yield ops_per_sec=Infinity and a null throughput in JSON).
+    bench = pybench.Bench(
+        warmup=0, iterations=3, target_time_ns=10_000_000, overhead_subtract=False,
+    )
 
     @bench.benchmark(throughput=1024.0)
     def hashing():

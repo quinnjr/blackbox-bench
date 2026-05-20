@@ -189,6 +189,43 @@ def test_report_unknown_format_raises():
         bench.report(format="bogus")
 
 
+def test_iter_batched_with_warmup_runs_setup_in_warmup_phase():
+    bench = pybench.Bench(warmup=2, iterations=3, target_time_ns=10_000_000)
+    setup_calls = [0]
+
+    @bench.benchmark
+    def t():
+        def setup():
+            setup_calls[0] += 1
+            return None
+
+        def routine(_):
+            pass
+
+        return bench.iter_batched(setup=setup, routine=routine)
+
+    bench.run()
+    # 1 calibrate + 2 warmup samples + 3 measurement samples
+    assert setup_calls[0] == 1 + 2 + 3
+
+
+def test_iter_batched_with_histogram_populates_result():
+    bench = pybench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000, histogram=True)
+
+    @bench.benchmark
+    def t():
+        def setup():
+            return None
+
+        def routine(_):
+            pass
+
+        return bench.iter_batched(setup=setup, routine=routine)
+
+    results = bench.run()
+    assert results[0].histogram is not None
+
+
 def test_iter_batched_setup_runs_per_sample_not_per_call():
     bench = pybench.Bench(warmup=0, iterations=5, target_time_ns=10_000_000)
     setup_calls = [0]

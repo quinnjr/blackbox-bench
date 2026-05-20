@@ -73,12 +73,9 @@ fn tukey(xs: &[i64]) -> (f64, usize) {
             clean_n += 1;
         }
     }
-    let clean_mean = if clean_n > 0 {
-        clean_sum / clean_n as f64
-    } else {
-        mean(xs)
-    };
-    (clean_mean, outliers)
+    // Q1 and Q3 are interior quantiles, so at least one sample always survives.
+    debug_assert!(clean_n > 0);
+    (clean_sum / clean_n as f64, outliers)
 }
 
 fn mad(xs: &[i64]) -> (f64, usize) {
@@ -91,19 +88,16 @@ fn mad(xs: &[i64]) -> (f64, usize) {
     let mut clean_n = 0usize;
     let mut outliers = 0usize;
     for &x in xs {
-        if (x as f64 - med).abs() > threshold && threshold > 0.0 {
+        if threshold > 0.0 && (x as f64 - med).abs() > threshold {
             outliers += 1;
         } else {
             clean_sum += x as f64;
             clean_n += 1;
         }
     }
-    let clean_mean = if clean_n > 0 {
-        clean_sum / clean_n as f64
-    } else {
-        mean(xs)
-    };
-    (clean_mean, outliers)
+    // The median itself is never an outlier from itself, so at least one sample survives.
+    debug_assert!(clean_n > 0);
+    (clean_sum / clean_n as f64, outliers)
 }
 
 fn quantile(buf: &mut [i64], k: usize) -> f64 {

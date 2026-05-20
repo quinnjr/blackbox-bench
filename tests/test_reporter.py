@@ -59,6 +59,82 @@ def test_to_xml_default_is_junit_compatible():
     assert sysout is not None and sysout.text and "mean_ns" in sysout.text
 
 
+def test_to_table_empty_results():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    # No benchmarks registered — results stays empty.
+    out = bench.to_table()
+    assert "No benchmark results" in out
+
+
+def test_fmt_time_units(tmp_path):
+    """Benchmark something slow enough to render in larger units."""
+    import time
+
+    bench = pybench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def slow():
+        time.sleep(0.001)  # 1ms
+
+    out = bench.to_table()
+    # Should render in ms range
+    assert ("µs" in out) or ("ms" in out) or ("s" in out and " ns" not in out.split("\n")[3])
+
+
+def test_json_str_escapes_in_name():
+    """Bench name with characters that exercise json_str's escape paths."""
+    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+
+    @bench.benchmark(name='quoted"\\back\nnewline\ttab\x01ctrl')
+    def f():
+        pass
+
+    raw = bench.to_json()
+    # Just check the JSON parses (escaping is correct) and the name is preserved
+    data = json.loads(raw)
+    assert data["results"][0]["name"] == 'quoted"\\back\nnewline\ttab\x01ctrl'
+
+
+def test_html_escape_special_chars_in_name():
+    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+
+    @bench.benchmark(name='<script>&"\'')
+    def f():
+        pass
+
+    html = bench.to_html()
+    assert "&lt;script&gt;" in html
+    assert "&amp;" in html
+    assert "&quot;" in html
+    assert "&#39;" in html
+
+
+def test_xml_escape_special_chars_in_name():
+    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+
+    @bench.benchmark(name='<x>&"\'')
+    def f():
+        pass
+
+    xml = bench.to_xml()
+    assert "&lt;x&gt;" in xml
+    assert "&amp;" in xml
+    assert "&quot;" in xml
+    assert "&apos;" in xml
+
+
+def test_json_includes_throughput_when_set():
+    bench = pybench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000)
+
+    @bench.benchmark(throughput=1024.0)
+    def hashing():
+        b"x" * 1024
+
+    data = json.loads(bench.to_json())
+    assert data["results"][0]["throughput_per_sec"] is not None
+    assert data["results"][0]["throughput_per_sec"] > 0
+
+
 def test_to_xml_raw_mirrors_json_structure():
     import xml.etree.ElementTree as ET
 

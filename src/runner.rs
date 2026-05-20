@@ -91,27 +91,7 @@ impl BenchmarkResult {
         rng: &mut fastrand::Rng,
     ) -> Self {
         let iterations = times_ns.len();
-        if iterations == 0 {
-            return Self {
-                name,
-                times_ns,
-                iterations: 0,
-                batch_size,
-                mean_ns: 0.0,
-                clean_mean_ns: 0.0,
-                median_ns: 0.0,
-                stddev_ns: 0.0,
-                min_ns: 0,
-                max_ns: 0,
-                ops_per_sec: 0.0,
-                outliers: 0,
-                ci95_low_ns: 0.0,
-                ci95_high_ns: 0.0,
-                throughput_per_sec: throughput,
-                param,
-                histogram,
-            };
-        }
+        debug_assert!(iterations > 0, "from_times must be called with at least one sample");
         let mean_ns = stats::mean(&times_ns);
         let median_ns = stats::median(&times_ns);
         let stddev_ns = stats::stddev(&times_ns);
@@ -322,13 +302,13 @@ impl Runner {
 
 impl Runner {
     fn calibrate(&self, py: Python<'_>, fn_: &PyObject) -> PyResult<usize> {
+        // The loop is bounded: a fn that took less than 5µs per call at batch=2^62
+        // would have to be physically impossible (sub-attosecond), so we don't
+        // guard the multiplication.
         let mut batch: usize = 1;
         loop {
             let elapsed = run_batch(py, fn_, batch)?;
             if elapsed >= MIN_BATCH_TIME_NS {
-                return Ok(batch);
-            }
-            if batch > (usize::MAX / 2) {
                 return Ok(batch);
             }
             batch *= 2;
@@ -354,9 +334,6 @@ impl Runner {
             }
             let elapsed = start.elapsed().as_nanos();
             if elapsed >= MIN_BATCH_TIME_NS {
-                return Ok(batch);
-            }
-            if batch > (usize::MAX / 2) {
                 return Ok(batch);
             }
             batch *= 2;

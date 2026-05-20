@@ -43,7 +43,7 @@ impl ComparisonReport {
             "table" => Ok(crate::report::format_comparison_table(&rows)),
             "json" => Ok(crate::report::format_comparison_json(&rows)),
             "html" => Ok(crate::report::format_comparison_html(&rows)),
-            "xml" => Ok(crate::report::format_comparison_xml(&rows, "junit")),
+            "xml" => Ok(crate::report::format_comparison_xml(&rows)),
             other => Err(pyo3::exceptions::PyValueError::new_err(format!(
                 "unknown format: {other}"
             ))),

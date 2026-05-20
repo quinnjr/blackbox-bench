@@ -32,6 +32,103 @@ def test_runner_batch_size_grows_for_fast_functions():
     assert r.batch_size > 1, "fast function should batch"
 
 
+def test_runner_overhead_subtract_false_skips_overhead_probe():
+    runner = pybench.Runner(
+        warmup=0, iterations=3, target_time_ns=10_000_000,
+        overhead_subtract=False, seed=42,
+    )
+
+    def noop():
+        pass
+
+    r = runner.run("no_overhead", noop)
+    assert r.iterations == 3
+
+
+def test_runner_outlier_method_none():
+    runner = pybench.Runner(
+        warmup=0, iterations=10, target_time_ns=10_000_000,
+        outlier_method="none",
+    )
+
+    def noop():
+        pass
+
+    r = runner.run("none_method", noop)
+    assert r.outliers == 0
+    assert r.clean_mean_ns == r.mean_ns
+
+
+def test_runner_outlier_method_mad():
+    runner = pybench.Runner(
+        warmup=0, iterations=10, target_time_ns=10_000_000,
+        outlier_method="mad",
+    )
+
+    def noop():
+        pass
+
+    r = runner.run("mad_method", noop)
+    assert r.iterations == 10
+
+
+def test_runner_invalid_outlier_method_raises():
+    import pytest
+
+    with pytest.raises(ValueError, match="outlier_method"):
+        pybench.Runner(warmup=0, iterations=3, outlier_method="bogus")
+
+
+def test_runner_iterations_none_uses_estimate():
+    runner = pybench.Runner(warmup=0, target_time_ns=5_000_000)
+
+    def noop():
+        pass
+
+    r = runner.run("auto_iters", noop)
+    # estimate_iters currently returns 100; assert it's the default value
+    assert r.iterations == 100
+
+
+def test_runner_iter_batched_returns_result():
+    """Cover Runner.run_iter_batched directly (vs through Bench.run)."""
+    runner = pybench.Runner(warmup=0, iterations=3, target_time_ns=10_000_000)
+
+    def setup():
+        return [3, 1, 2]
+
+    def routine(xs):
+        sorted(xs)
+
+    r = runner.run_iter_batched("via_runner", setup, routine, None, None)
+    assert r.name == "via_runner"
+    assert r.iterations == 3
+
+
+def test_benchmark_result_repr():
+    runner = pybench.Runner(warmup=0, iterations=3, target_time_ns=10_000_000)
+
+    def noop():
+        pass
+
+    r = runner.run("named", noop)
+    s = repr(r)
+    assert "named" in s and "mean_ns" in s
+
+
+def test_benchmark_result_to_dict_round_trip():
+    runner = pybench.Runner(warmup=0, iterations=3, target_time_ns=10_000_000)
+
+    def noop():
+        pass
+
+    r = runner.run("dict_test", noop)
+    d = r.to_dict()
+    assert d["name"] == "dict_test"
+    assert d["iterations"] == 3
+    assert d["param"] is None
+
+
 def test_runner_respects_warmup():
     calls = [0]
 

@@ -51,6 +51,15 @@ fn layout_table(title: &str, headers: &[&str], rows: &[Vec<String>]) -> String {
     out
 }
 
+fn json_num(x: f64) -> String {
+    // JSON does not allow Infinity / NaN. Emit null in that case.
+    if x.is_finite() {
+        format!("{x}")
+    } else {
+        "null".to_string()
+    }
+}
+
 fn json_str(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
@@ -69,68 +78,6 @@ fn json_str(s: &str) -> String {
     out
 }
 
-pub fn format_table(results: &[BenchmarkResult]) -> String {
-    if results.is_empty() {
-        return "No benchmark results.".into();
-    }
-    let headers = [
-        "Name", "Mean", "Median", "StdDev", "Min", "Max", "Ops/sec", "CI 95%", "Outliers",
-    ];
-    let mut rows: Vec<Vec<String>> = Vec::new();
-    for r in results {
-        rows.push(vec![
-            r.name.clone(),
-            fmt_time(r.mean_ns),
-            fmt_time(r.median_ns),
-            fmt_time(r.stddev_ns),
-            fmt_time(r.min_ns as f64),
-            fmt_time(r.max_ns as f64),
-            format!("{:.0}", r.ops_per_sec),
-            format!(
-                "[{}, {}]",
-                fmt_time(r.ci95_low_ns),
-                fmt_time(r.ci95_high_ns)
-            ),
-            r.outliers.to_string(),
-        ]);
-    }
-    layout_table("pybench results", &headers, &rows)
-}
-
-pub fn format_json(results: &[BenchmarkResult], metadata: &str) -> String {
-    let mut s = String::with_capacity(1024);
-    s.push_str("{\n  \"metadata\": ");
-    s.push_str(metadata);
-    s.push_str(",\n  \"results\": [\n");
-    for (i, r) in results.iter().enumerate() {
-        s.push_str("    {");
-        s.push_str(&format!("\"name\":{},", json_str(&r.name)));
-        s.push_str(&format!("\"iterations\":{},", r.iterations));
-        s.push_str(&format!("\"batch_size\":{},", r.batch_size));
-        s.push_str(&format!("\"mean_ns\":{},", r.mean_ns));
-        s.push_str(&format!("\"clean_mean_ns\":{},", r.clean_mean_ns));
-        s.push_str(&format!("\"median_ns\":{},", r.median_ns));
-        s.push_str(&format!("\"stddev_ns\":{},", r.stddev_ns));
-        s.push_str(&format!("\"min_ns\":{},", r.min_ns));
-        s.push_str(&format!("\"max_ns\":{},", r.max_ns));
-        s.push_str(&format!("\"ops_per_sec\":{},", r.ops_per_sec));
-        s.push_str(&format!("\"outliers\":{},", r.outliers));
-        s.push_str(&format!("\"ci95_low_ns\":{},", r.ci95_low_ns));
-        s.push_str(&format!("\"ci95_high_ns\":{},", r.ci95_high_ns));
-        match r.throughput_per_sec {
-            Some(t) => s.push_str(&format!("\"throughput_per_sec\":{},", t)),
-            None => s.push_str("\"throughput_per_sec\":null,"),
-        }
-        s.push_str("\"param\":null}");
-        if i + 1 < results.len() {
-            s.push(',');
-        }
-        s.push('\n');
-    }
-    s.push_str("  ]\n}");
-    s
-}
-
 fn html_escape(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
@@ -147,11 +94,12 @@ fn html_escape(s: &str) -> String {
 }
 
 fn sparkline_svg(samples: &[i64]) -> String {
+    // Caller always passes a populated samples slice — Runner.run only emits a
+    // BenchmarkResult after at least one sample, and the HTML reporter only
+    // sees BenchmarkResults from Runner.
+    debug_assert!(!samples.is_empty());
     let width: usize = 120;
     let height: usize = 30;
-    if samples.is_empty() {
-        return String::new();
-    }
     let bins = 24usize;
     let (mn, mx) = (*samples.iter().min().unwrap(), *samples.iter().max().unwrap());
     if mx == mn {
@@ -188,10 +136,6 @@ fn sparkline_svg(samples: &[i64]) -> String {
         h = height,
         p = path
     )
-}
-
-pub fn format_html(_results: &[BenchmarkResult], _metadata: &str) -> String {
-    String::new()
 }
 
 pub fn format_html_refs(results: &[&BenchmarkResult], metadata: &str) -> String {
@@ -265,14 +209,10 @@ fn xml_escape(s: &str) -> String {
     out
 }
 
-pub fn format_xml(_results: &[BenchmarkResult], _style: &str) -> String {
-    String::new()
-}
-
 pub fn format_xml_refs(results: &[&BenchmarkResult], style: &str) -> String {
     match style {
         "raw" => format_xml_raw(results),
-        _ => format_xml_junit(results, None),
+        _ => format_xml_junit(results),
     }
 }
 
@@ -287,14 +227,12 @@ fn result_to_json_inline(r: &BenchmarkResult) -> String {
     )
 }
 
-fn format_xml_junit(results: &[&BenchmarkResult], failures: Option<&[(String, String)]>) -> String {
+fn format_xml_junit(results: &[&BenchmarkResult]) -> String {
     let mut s = String::with_capacity(1024);
     s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-    let n_failures = failures.map_or(0, |f| f.len());
     s.push_str(&format!(
-        "<testsuite name=\"pybench\" tests=\"{}\" failures=\"{}\">\n",
+        "<testsuite name=\"pybench\" tests=\"{}\" failures=\"0\">\n",
         results.len(),
-        n_failures,
     ));
     for r in results {
         s.push_str(&format!(
@@ -302,14 +240,6 @@ fn format_xml_junit(results: &[&BenchmarkResult], failures: Option<&[(String, St
             xml_escape(&r.name),
             r.mean_ns / 1_000_000_000.0,
         ));
-        if let Some(f) = failures {
-            if let Some((_, msg)) = f.iter().find(|(n, _)| n == &r.name) {
-                s.push_str(&format!(
-                    "    <failure message=\"{}\"/>\n",
-                    xml_escape(msg)
-                ));
-            }
-        }
         s.push_str("    <system-out><![CDATA[");
         s.push_str(&result_to_json_inline(r));
         s.push_str("]]></system-out>\n");
@@ -438,22 +368,10 @@ pub fn format_comparison_html(rows: &[DiffRowView]) -> String {
     s
 }
 
-pub fn format_comparison_xml(rows: &[DiffRowView], style: &str) -> String {
-    if style == "raw" {
-        let mut s = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<comparison>\n");
-        for d in rows {
-            s.push_str(&format!(
-                "  <row name=\"{}\" classification=\"{}\"/>\n",
-                xml_escape(&d.name),
-                xml_escape(&d.classification),
-            ));
-        }
-        s.push_str("</comparison>\n");
-        return s;
-    }
-    // JUnit: regressions = failures. Synthesize minimal BenchmarkResult-like
-    // surface inline; format_xml_junit only reads name + mean_ns + system-out
-    // JSON snapshot, so a small placeholder is sufficient.
+pub fn format_comparison_xml(rows: &[DiffRowView]) -> String {
+    // JUnit-style: regressed rows become <failure>. We synthesize the testsuite
+    // shell inline rather than threading a Vec<(name, message)> through
+    // format_xml_junit, because the comparison case has its own per-row data.
     let mut s = String::with_capacity(1024);
     s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     let failures: Vec<&DiffRowView> = rows
@@ -556,18 +474,18 @@ pub fn format_json_refs(results: &[&BenchmarkResult], metadata: &str) -> String 
         s.push_str(&format!("\"name\":{},", json_str(&r.name)));
         s.push_str(&format!("\"iterations\":{},", r.iterations));
         s.push_str(&format!("\"batch_size\":{},", r.batch_size));
-        s.push_str(&format!("\"mean_ns\":{},", r.mean_ns));
-        s.push_str(&format!("\"clean_mean_ns\":{},", r.clean_mean_ns));
-        s.push_str(&format!("\"median_ns\":{},", r.median_ns));
-        s.push_str(&format!("\"stddev_ns\":{},", r.stddev_ns));
+        s.push_str(&format!("\"mean_ns\":{},", json_num(r.mean_ns)));
+        s.push_str(&format!("\"clean_mean_ns\":{},", json_num(r.clean_mean_ns)));
+        s.push_str(&format!("\"median_ns\":{},", json_num(r.median_ns)));
+        s.push_str(&format!("\"stddev_ns\":{},", json_num(r.stddev_ns)));
         s.push_str(&format!("\"min_ns\":{},", r.min_ns));
         s.push_str(&format!("\"max_ns\":{},", r.max_ns));
-        s.push_str(&format!("\"ops_per_sec\":{},", r.ops_per_sec));
+        s.push_str(&format!("\"ops_per_sec\":{},", json_num(r.ops_per_sec)));
         s.push_str(&format!("\"outliers\":{},", r.outliers));
-        s.push_str(&format!("\"ci95_low_ns\":{},", r.ci95_low_ns));
-        s.push_str(&format!("\"ci95_high_ns\":{},", r.ci95_high_ns));
+        s.push_str(&format!("\"ci95_low_ns\":{},", json_num(r.ci95_low_ns)));
+        s.push_str(&format!("\"ci95_high_ns\":{},", json_num(r.ci95_high_ns)));
         match r.throughput_per_sec {
-            Some(t) => s.push_str(&format!("\"throughput_per_sec\":{},", t)),
+            Some(t) => s.push_str(&format!("\"throughput_per_sec\":{},", json_num(t))),
             None => s.push_str("\"throughput_per_sec\":null,"),
         }
         s.push_str("\"param\":null}");
@@ -578,4 +496,35 @@ pub fn format_json_refs(results: &[&BenchmarkResult], metadata: &str) -> String 
     }
     s.push_str("  ]\n}");
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fmt_time_picks_units_by_magnitude() {
+        assert!(fmt_time(500.0).contains("ns"));
+        assert!(fmt_time(5_000.0).contains("µs"));
+        assert!(fmt_time(5_000_000.0).contains("ms"));
+        assert!(fmt_time(5_000_000_000.0).contains(" s"));
+    }
+
+    #[test]
+    fn json_num_finite_is_number_non_finite_is_null() {
+        assert_eq!(json_num(1.5), "1.5");
+        assert_eq!(json_num(f64::INFINITY), "null");
+        assert_eq!(json_num(f64::NEG_INFINITY), "null");
+        assert_eq!(json_num(f64::NAN), "null");
+    }
+
+    #[test]
+    fn json_str_escapes_all_control_chars() {
+        assert_eq!(json_str("a\rb"), "\"a\\rb\"");
+        assert_eq!(json_str("a\nb"), "\"a\\nb\"");
+        assert_eq!(json_str("a\tb"), "\"a\\tb\"");
+        assert_eq!(json_str("a\"b"), "\"a\\\"b\"");
+        assert_eq!(json_str("a\\b"), "\"a\\\\b\"");
+        assert_eq!(json_str("\x01"), "\"\\u0001\"");
+    }
 }

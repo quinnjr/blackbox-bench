@@ -43,3 +43,31 @@ def test_to_html_includes_sparkline_svg():
     bench = _bench_with_one_result()
     html = bench.to_html()
     assert "<svg" in html and "<path" in html
+
+
+def test_to_xml_default_is_junit_compatible():
+    import xml.etree.ElementTree as ET
+
+    bench = _bench_with_one_result()
+    xml = bench.to_xml()
+    tree = ET.fromstring(xml)
+    assert tree.tag == "testsuite"
+    cases = tree.findall("testcase")
+    assert len(cases) == 1
+    assert cases[0].get("name") == "x"
+    sysout = cases[0].find("system-out")
+    assert sysout is not None and sysout.text and "mean_ns" in sysout.text
+
+
+def test_to_xml_raw_mirrors_json_structure():
+    import xml.etree.ElementTree as ET
+
+    bench = _bench_with_one_result()
+    xml = bench.to_xml(style="raw")
+    tree = ET.fromstring(xml)
+    assert tree.tag == "pybench"
+    results = tree.find("results")
+    assert results is not None
+    rows = results.findall("result")
+    assert len(rows) == 1
+    assert rows[0].get("name") == "x"

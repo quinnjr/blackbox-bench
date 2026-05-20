@@ -13,6 +13,7 @@ from pybench._pybench import (
     _format_results_html,
     _format_results_json,
     _format_results_table,
+    _format_results_xml,
     _synthesize,
 )
 
@@ -134,13 +135,20 @@ class Bench:
         )
         return _format_results_html(self._results, metadata)
 
-    def report(self, format: str = "table", path: str | None = None) -> None:
+    def to_xml(self, style: str = "junit") -> str:
+        if not self._results:
+            self.run()
+        return _format_results_xml(self._results, style)
+
+    def report(self, format: str = "table", path: str | None = None, xml_style: str = "junit") -> None:
         if format == "table":
             text = self.to_table()
         elif format == "json":
             text = self.to_json()
         elif format == "html":
             text = self.to_html()
+        elif format == "xml":
+            text = self.to_xml(style=xml_style)
         else:
             raise ValueError(f"unknown format: {format}")
         if path:

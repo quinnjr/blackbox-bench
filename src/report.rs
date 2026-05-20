@@ -250,8 +250,93 @@ pub fn format_html_refs(results: &[&BenchmarkResult], metadata: &str) -> String 
     s
 }
 
+fn xml_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&apos;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
 pub fn format_xml(_results: &[BenchmarkResult], _style: &str) -> String {
     String::new()
+}
+
+pub fn format_xml_refs(results: &[&BenchmarkResult], style: &str) -> String {
+    match style {
+        "raw" => format_xml_raw(results),
+        _ => format_xml_junit(results, None),
+    }
+}
+
+fn result_to_json_inline(r: &BenchmarkResult) -> String {
+    format!(
+        "{{\"name\":{name},\"mean_ns\":{m},\"median_ns\":{med},\"ci95_low_ns\":{lo},\"ci95_high_ns\":{hi}}}",
+        name = json_str(&r.name),
+        m = r.mean_ns,
+        med = r.median_ns,
+        lo = r.ci95_low_ns,
+        hi = r.ci95_high_ns,
+    )
+}
+
+fn format_xml_junit(results: &[&BenchmarkResult], failures: Option<&[(String, String)]>) -> String {
+    let mut s = String::with_capacity(1024);
+    s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    let n_failures = failures.map_or(0, |f| f.len());
+    s.push_str(&format!(
+        "<testsuite name=\"pybench\" tests=\"{}\" failures=\"{}\">\n",
+        results.len(),
+        n_failures,
+    ));
+    for r in results {
+        s.push_str(&format!(
+            "  <testcase name=\"{}\" time=\"{:.9}\">\n",
+            xml_escape(&r.name),
+            r.mean_ns / 1_000_000_000.0,
+        ));
+        if let Some(f) = failures {
+            if let Some((_, msg)) = f.iter().find(|(n, _)| n == &r.name) {
+                s.push_str(&format!(
+                    "    <failure message=\"{}\"/>\n",
+                    xml_escape(msg)
+                ));
+            }
+        }
+        s.push_str("    <system-out><![CDATA[");
+        s.push_str(&result_to_json_inline(r));
+        s.push_str("]]></system-out>\n");
+        s.push_str("  </testcase>\n");
+    }
+    s.push_str("</testsuite>\n");
+    s
+}
+
+fn format_xml_raw(results: &[&BenchmarkResult]) -> String {
+    let mut s = String::with_capacity(1024);
+    s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<pybench>\n  <results>\n");
+    for r in results {
+        s.push_str(&format!(
+            "    <result name=\"{}\" iterations=\"{}\" mean_ns=\"{}\" median_ns=\"{}\" \
+             ci95_low_ns=\"{}\" ci95_high_ns=\"{}\" outliers=\"{}\"/>\n",
+            xml_escape(&r.name),
+            r.iterations,
+            r.mean_ns,
+            r.median_ns,
+            r.ci95_low_ns,
+            r.ci95_high_ns,
+            r.outliers,
+        ));
+    }
+    s.push_str("  </results>\n</pybench>\n");
+    s
 }
 
 pub fn format_comparison_table(rows: &[DiffRowView]) -> String {
@@ -353,8 +438,54 @@ pub fn format_comparison_html(rows: &[DiffRowView]) -> String {
     s
 }
 
-pub fn format_comparison_xml(_: &[DiffRowView], _: &str) -> String {
-    String::new()
+pub fn format_comparison_xml(rows: &[DiffRowView], style: &str) -> String {
+    if style == "raw" {
+        let mut s = String::from("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<comparison>\n");
+        for d in rows {
+            s.push_str(&format!(
+                "  <row name=\"{}\" classification=\"{}\"/>\n",
+                xml_escape(&d.name),
+                xml_escape(&d.classification),
+            ));
+        }
+        s.push_str("</comparison>\n");
+        return s;
+    }
+    // JUnit: regressions = failures. Synthesize minimal BenchmarkResult-like
+    // surface inline; format_xml_junit only reads name + mean_ns + system-out
+    // JSON snapshot, so a small placeholder is sufficient.
+    let mut s = String::with_capacity(1024);
+    s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+    let failures: Vec<&DiffRowView> = rows
+        .iter()
+        .filter(|d| d.classification == "regressed")
+        .collect();
+    s.push_str(&format!(
+        "<testsuite name=\"pybench\" tests=\"{}\" failures=\"{}\">\n",
+        rows.len(),
+        failures.len(),
+    ));
+    for d in rows {
+        let mean = d.current_mean_ns.unwrap_or(0.0);
+        s.push_str(&format!(
+            "  <testcase name=\"{}\" time=\"{:.9}\">\n",
+            xml_escape(&d.name),
+            mean / 1_000_000_000.0,
+        ));
+        if d.classification == "regressed" {
+            s.push_str(&format!(
+                "    <failure message=\"regression: {:+.1}% (CI disjoint from baseline)\"/>\n",
+                d.change_pct.unwrap_or(0.0),
+            ));
+        }
+        s.push_str(&format!(
+            "    <system-out><![CDATA[{{\"classification\":{}}}]]></system-out>\n",
+            json_str(&d.classification),
+        ));
+        s.push_str("  </testcase>\n");
+    }
+    s.push_str("</testsuite>\n");
+    s
 }
 
 // --- PyO3 helpers exported to Python -----------------------------------------
@@ -375,6 +506,12 @@ pub fn _format_results_json(results: Vec<PyRef<BenchmarkResult>>, metadata: &str
 pub fn _format_results_html(results: Vec<PyRef<BenchmarkResult>>, metadata: &str) -> String {
     let refs: Vec<&BenchmarkResult> = results.iter().map(|r| &**r).collect();
     format_html_refs(&refs, metadata)
+}
+
+#[pyfunction]
+pub fn _format_results_xml(results: Vec<PyRef<BenchmarkResult>>, style: &str) -> String {
+    let refs: Vec<&BenchmarkResult> = results.iter().map(|r| &**r).collect();
+    format_xml_refs(&refs, style)
 }
 
 // Helpers that take &[&BenchmarkResult] (the form PyRef gives us). The

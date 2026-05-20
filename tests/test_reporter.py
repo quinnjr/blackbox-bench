@@ -27,3 +27,19 @@ def test_to_json_round_trips():
     assert "metadata" in data and "results" in data
     assert data["results"][0]["name"] == "x"
     assert "ci95_low_ns" in data["results"][0]
+
+
+def test_to_html_self_contained_no_external_refs():
+    bench = _bench_with_one_result()
+    html = bench.to_html()
+    assert "<html" in html.lower() and "</html>" in html.lower()
+    assert "x" in html
+    assert "ci 95%" in html.lower()
+    assert "http://" not in html and "https://" not in html
+    assert "cdn." not in html.lower()
+
+
+def test_to_html_includes_sparkline_svg():
+    bench = _bench_with_one_result()
+    html = bench.to_html()
+    assert "<svg" in html and "<path" in html

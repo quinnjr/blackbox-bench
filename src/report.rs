@@ -131,8 +131,123 @@ pub fn format_json(results: &[BenchmarkResult], metadata: &str) -> String {
     s
 }
 
+fn html_escape(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            '"' => out.push_str("&quot;"),
+            '\'' => out.push_str("&#39;"),
+            c => out.push(c),
+        }
+    }
+    out
+}
+
+fn sparkline_svg(samples: &[i64]) -> String {
+    let width: usize = 120;
+    let height: usize = 30;
+    if samples.is_empty() {
+        return String::new();
+    }
+    let bins = 24usize;
+    let (mn, mx) = (*samples.iter().min().unwrap(), *samples.iter().max().unwrap());
+    if mx == mn {
+        return format!(
+            "<svg class=\"spark\" width=\"{w}\" height=\"{h}\"><path d=\"M0 {y} L{w} {y}\" stroke=\"#88a\" fill=\"none\"/></svg>",
+            w = width,
+            h = height,
+            y = height / 2
+        );
+    }
+    let mut counts = vec![0usize; bins];
+    let range = (mx - mn) as f64;
+    for &x in samples {
+        let mut b = (((x - mn) as f64 / range) * bins as f64) as usize;
+        if b >= bins {
+            b = bins - 1;
+        }
+        counts[b] += 1;
+    }
+    let cmax = *counts.iter().max().unwrap() as f64;
+    let bin_w = width as f64 / bins as f64;
+    let mut path = String::from("M0 ");
+    path.push_str(&format!("{}", height));
+    for (i, &c) in counts.iter().enumerate() {
+        let h = (c as f64 / cmax) * (height as f64 - 2.0);
+        let x = (i as f64) * bin_w;
+        path.push_str(&format!(" L{:.2} {:.2}", x, height as f64 - h));
+        path.push_str(&format!(" L{:.2} {:.2}", x + bin_w, height as f64 - h));
+    }
+    path.push_str(&format!(" L{} {} Z", width, height));
+    format!(
+        "<svg class=\"spark\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><path d=\"{p}\" fill=\"#88a\"/></svg>",
+        w = width,
+        h = height,
+        p = path
+    )
+}
+
 pub fn format_html(_results: &[BenchmarkResult], _metadata: &str) -> String {
     String::new()
+}
+
+pub fn format_html_refs(results: &[&BenchmarkResult], metadata: &str) -> String {
+    let mut s = String::with_capacity(4096);
+    s.push_str("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
+    s.push_str("<title>pybench results</title>");
+    s.push_str("<style>\n");
+    s.push_str("body{font-family:system-ui,-apple-system,sans-serif;margin:2rem;color:#222;}\n");
+    s.push_str("table{border-collapse:collapse;width:100%;font-size:0.9rem;}\n");
+    s.push_str("th,td{padding:0.4rem 0.6rem;border-bottom:1px solid #ddd;text-align:right;}\n");
+    s.push_str("th:first-child,td:first-child{text-align:left;}\n");
+    s.push_str("th{background:#f4f4f4;}\n");
+    s.push_str(".spark{display:inline-block;vertical-align:middle;}\n");
+    s.push_str(".badge{padding:0.1rem 0.5rem;border-radius:0.3rem;font-size:0.8rem;}\n");
+    s.push_str(".regressed{background:#fee;color:#900;}\n");
+    s.push_str(".improved{background:#efe;color:#070;}\n");
+    s.push_str(".unchanged{background:#eef;color:#226;}\n");
+    s.push_str("</style></head><body>\n");
+    s.push_str("<h1>pybench results</h1>\n");
+    s.push_str(&format!("<pre>{}</pre>\n", html_escape(metadata)));
+    s.push_str("<table><thead><tr>");
+    for h in [
+        "Name",
+        "Mean",
+        "Median",
+        "StdDev",
+        "Min",
+        "Max",
+        "Ops/sec",
+        "CI 95%",
+        "Outliers",
+        "Distribution",
+    ] {
+        s.push_str(&format!("<th>{}</th>", html_escape(h)));
+    }
+    s.push_str("</tr></thead><tbody>\n");
+    for r in results {
+        s.push_str("<tr>");
+        s.push_str(&format!("<td>{}</td>", html_escape(&r.name)));
+        s.push_str(&format!("<td>{}</td>", fmt_time(r.mean_ns)));
+        s.push_str(&format!("<td>{}</td>", fmt_time(r.median_ns)));
+        s.push_str(&format!("<td>{}</td>", fmt_time(r.stddev_ns)));
+        s.push_str(&format!("<td>{}</td>", fmt_time(r.min_ns as f64)));
+        s.push_str(&format!("<td>{}</td>", fmt_time(r.max_ns as f64)));
+        s.push_str(&format!("<td>{:.0}</td>", r.ops_per_sec));
+        s.push_str(&format!(
+            "<td>[{}, {}]</td>",
+            fmt_time(r.ci95_low_ns),
+            fmt_time(r.ci95_high_ns)
+        ));
+        s.push_str(&format!("<td>{}</td>", r.outliers));
+        s.push_str(&format!("<td>{}</td>", sparkline_svg(&r.times_ns)));
+        s.push_str("</tr>\n");
+    }
+    s.push_str("</tbody></table></body></html>\n");
+    s
 }
 
 pub fn format_xml(_results: &[BenchmarkResult], _style: &str) -> String {
@@ -193,8 +308,49 @@ pub fn format_comparison_json(rows: &[DiffRowView]) -> String {
     s
 }
 
-pub fn format_comparison_html(_: &[DiffRowView]) -> String {
-    String::new()
+pub fn format_comparison_html(rows: &[DiffRowView]) -> String {
+    let mut s = String::with_capacity(2048);
+    s.push_str("<!doctype html><html><head><meta charset=\"utf-8\"><title>pybench comparison</title>");
+    s.push_str("<style>");
+    s.push_str("body{font-family:system-ui,sans-serif;margin:2rem;}");
+    s.push_str("table{border-collapse:collapse;width:100%;}");
+    s.push_str("th,td{padding:0.4rem 0.6rem;border-bottom:1px solid #ddd;text-align:right;}");
+    s.push_str("th:first-child,td:first-child{text-align:left;}");
+    s.push_str(".regressed{color:#900;font-weight:600;}.improved{color:#070;font-weight:600;}.unchanged{color:#446;}");
+    s.push_str("</style></head><body><h1>pybench comparison</h1><table><thead><tr>");
+    for h in ["Name", "Baseline", "Current", "Change", "Status"] {
+        s.push_str(&format!("<th>{}</th>", html_escape(h)));
+    }
+    s.push_str("</tr></thead><tbody>");
+    for d in rows {
+        s.push_str("<tr>");
+        s.push_str(&format!("<td>{}</td>", html_escape(&d.name)));
+        s.push_str(&format!(
+            "<td>{}</td>",
+            d.baseline_mean_ns
+                .map(fmt_time)
+                .unwrap_or_else(|| "N/A".into())
+        ));
+        s.push_str(&format!(
+            "<td>{}</td>",
+            d.current_mean_ns
+                .map(fmt_time)
+                .unwrap_or_else(|| "N/A".into())
+        ));
+        s.push_str(&format!(
+            "<td>{}</td>",
+            d.change_pct
+                .map(|p| format!("{:+.1}%", p))
+                .unwrap_or_else(|| "N/A".into())
+        ));
+        s.push_str(&format!(
+            "<td class=\"{cls}\">{cls}</td>",
+            cls = d.classification
+        ));
+        s.push_str("</tr>");
+    }
+    s.push_str("</tbody></table></body></html>");
+    s
 }
 
 pub fn format_comparison_xml(_: &[DiffRowView], _: &str) -> String {
@@ -213,6 +369,12 @@ pub fn _format_results_table(results: Vec<PyRef<BenchmarkResult>>) -> String {
 pub fn _format_results_json(results: Vec<PyRef<BenchmarkResult>>, metadata: &str) -> String {
     let refs: Vec<&BenchmarkResult> = results.iter().map(|r| &**r).collect();
     format_json_refs(&refs, metadata)
+}
+
+#[pyfunction]
+pub fn _format_results_html(results: Vec<PyRef<BenchmarkResult>>, metadata: &str) -> String {
+    let refs: Vec<&BenchmarkResult> = results.iter().map(|r| &**r).collect();
+    format_html_refs(&refs, metadata)
 }
 
 // Helpers that take &[&BenchmarkResult] (the form PyRef gives us). The

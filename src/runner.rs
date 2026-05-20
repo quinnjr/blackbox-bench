@@ -82,6 +82,7 @@ impl BenchmarkResult {
 impl BenchmarkResult {
     #[allow(clippy::too_many_arguments)]
     pub fn from_times(
+        py: Python<'_>,
         name: String,
         times_ns: Vec<i64>,
         batch_size: usize,
@@ -96,25 +97,33 @@ impl BenchmarkResult {
     ) -> Self {
         let iterations = times_ns.len();
         debug_assert!(iterations > 0, "from_times must be called with at least one sample");
-        let mean_ns = stats::mean(&times_ns);
-        let median_ns = stats::median(&times_ns, samples_scratch);
-        let stddev_ns = stats::stddev(&times_ns);
-        let min_ns = *times_ns.iter().min().unwrap();
-        let max_ns = *times_ns.iter().max().unwrap();
+        // Compute stats with the GIL released — bootstrap_ci_mean alone runs
+        // 10,000 × N inner iterations of pure Rust, blocking any other Python
+        // thread until it returns.
+        let (mean_ns, median_ns, stddev_ns, min_ns, max_ns, clean_mean_ns, outliers,
+             ci95_low_ns, ci95_high_ns) = py.allow_threads(|| {
+            let mean_ns = stats::mean(&times_ns);
+            let median_ns = stats::median(&times_ns, samples_scratch);
+            let stddev_ns = stats::stddev(&times_ns);
+            let min_ns = *times_ns.iter().min().unwrap();
+            let max_ns = *times_ns.iter().max().unwrap();
+            let (clean_mean_ns, outliers) =
+                stats::detect_outliers(&times_ns, outlier_method, samples_scratch);
+            let (ci95_low_ns, ci95_high_ns) = stats::bootstrap_ci_mean(
+                &times_ns,
+                confidence_level,
+                BOOTSTRAP_RESAMPLES,
+                rng,
+                means_scratch,
+            );
+            (mean_ns, median_ns, stddev_ns, min_ns, max_ns,
+             clean_mean_ns, outliers, ci95_low_ns, ci95_high_ns)
+        });
         let ops_per_sec = if mean_ns > 0.0 {
             1_000_000_000.0 / mean_ns
         } else {
             f64::INFINITY
         };
-        let (clean_mean_ns, outliers) =
-            stats::detect_outliers(&times_ns, outlier_method, samples_scratch);
-        let (ci95_low_ns, ci95_high_ns) = stats::bootstrap_ci_mean(
-            &times_ns,
-            confidence_level,
-            BOOTSTRAP_RESAMPLES,
-            rng,
-            means_scratch,
-        );
         let throughput_per_sec = throughput.map(|bytes| bytes * ops_per_sec);
         Self {
             name,
@@ -267,6 +276,7 @@ impl Runner {
             ..
         } = *self;
         Ok(BenchmarkResult::from_times(
+            py,
             name,
             times,
             batch_size,
@@ -333,6 +343,7 @@ impl Runner {
             ..
         } = *self;
         Ok(BenchmarkResult::from_times(
+            py,
             name,
             times,
             batch_size,
@@ -418,11 +429,12 @@ fn call_routine_batch_ptr(
 }
 
 #[pyfunction]
-pub fn _synthesize(name: String, elapsed_ns: i64) -> BenchmarkResult {
+pub fn _synthesize(py: Python<'_>, name: String, elapsed_ns: i64) -> BenchmarkResult {
     let mut rng = fastrand::Rng::with_seed(0);
     let mut samples_scratch = Vec::new();
     let mut means_scratch = Vec::new();
     BenchmarkResult::from_times(
+        py,
         name,
         vec![elapsed_ns],
         1,

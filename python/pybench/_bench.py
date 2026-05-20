@@ -19,6 +19,12 @@ from pybench._pybench import (
 
 _global_registry: list[tuple[str, Callable[..., Any], dict[str, Any]]] = []
 
+# These don't change during a process lifetime — compute once at import so
+# every to_json()/to_html() call doesn't pay platform-module lookup costs.
+_PYTHON_VERSION = platform.python_version()
+_PLATFORM_SYSTEM = platform.system()
+_PYBENCH_VERSION = "1.0.0"
+
 
 class Bench:
     def __init__(
@@ -117,23 +123,21 @@ class Bench:
     def to_json(self) -> str:
         if not self._results:
             self.run()
+        # Only the timestamp changes per call; the rest is precomputed.
         metadata = (
-            '{"python_version": "%s", "platform": "%s", "timestamp": "%s", "pybench_version": "1.0.0a1"}'
-            % (
-                platform.python_version(),
-                platform.system(),
-                datetime.now(timezone.utc).isoformat(),
-            )
+            f'{{"python_version": "{_PYTHON_VERSION}", '
+            f'"platform": "{_PLATFORM_SYSTEM}", '
+            f'"timestamp": "{datetime.now(timezone.utc).isoformat()}", '
+            f'"pybench_version": "{_PYBENCH_VERSION}"}}'
         )
         return _format_results_json(self._results, metadata)
 
     def to_html(self) -> str:
         if not self._results:
             self.run()
-        metadata = "%s on %s at %s" % (
-            platform.python_version(),
-            platform.system(),
-            datetime.now(timezone.utc).isoformat(),
+        metadata = (
+            f"{_PYTHON_VERSION} on {_PLATFORM_SYSTEM} at "
+            f"{datetime.now(timezone.utc).isoformat()}"
         )
         return _format_results_html(self._results, metadata)
 

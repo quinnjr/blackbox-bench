@@ -38,7 +38,7 @@ impl HdrHistogram {
     }
 
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyDict>> {
-        let d = pyo3::types::PyDict::new_bound(py);
+        let d = pyo3::types::PyDict::new(py);
         d.set_item("min", self.inner.min())?;
         d.set_item("max", self.inner.max())?;
         d.set_item("count", self.inner.len())?;

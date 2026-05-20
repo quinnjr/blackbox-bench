@@ -1,58 +1,39 @@
 # pybench
 
-> A lightweight, zero-dependency Python benchmarking library with decorator and context manager APIs, CLI, and run comparison.
+A lightweight Python microbenchmarking library with a Rust core (PyO3).
 
-pybench provides a simple way to benchmark Python code using decorators, context managers, or a CLI. It automatically determines iteration counts to reach a target measurement time, computes statistics (mean, median, standard deviation, min, max), and can output results as formatted tables or JSON. A built-in comparison command lets you diff two benchmark runs to track performance regressions. Zero required dependencies, works with Python 3.10+.
+## Top-level exports
+- pybench.Bench(warmup, target_time_ns, iterations, confidence_level,
+  outlier_method, overhead_subtract, histogram, seed)
+- pybench.benchmark — module-level decorator
+- pybench.black_box — opaque pass-through (prevents constant folding)
+- pybench.BenchmarkResult — frozen result class with statistical fields
+- pybench.HdrHistogram — opt-in HDR histogram
+- pybench.compare(baseline_json, current_json) -> ComparisonReport
+- pybench.Runner — low-level entry point (usually not needed)
+
+## CLI
+
+```
+pybench run [PATH] [--warmup N] [--iterations N] [--target-time-ns N]
+            [--format {table,json,html,xml}] [--xml-style {junit,raw}]
+            [--output FILE] [--save FILE] [--profile]
+pybench compare BASELINE CURRENT [--format ...] [--output FILE]
+```
+
+## Features
+
+- Per-batch timing with auto-batch-sizing
+- Bootstrap 95% confidence intervals
+- Tukey / MAD outlier detection
+- Harness-overhead measurement and subtraction
+- Setup-isolated benchmarks (iter_batched)
+- Throughput, parameterized benchmarks, HDR histograms
+- HTML / JUnit-XML / JSON / table reporters
+- CI-based regression classifier (unchanged / regressed / improved / new / removed)
+- py-spy flamegraph integration via --profile
 
 ## Links
 
 - [Documentation](https://quinnjr.github.io/pybench/)
 - [GitHub Repository](https://github.com/quinnjr/pybench)
-
-## Key Features
-
-- Decorator API (`@benchmark` or `@bench.benchmark`) for registering benchmark functions
-- Context manager API (`bench.measure("name")`) for inline benchmarks
-- Automatic iteration calibration targeting a configurable measurement time
-- Warmup iterations to stabilize results before measurement
-- Statistical output: mean, median, standard deviation, min, max
-- JSON output and file saving for CI integration
-- `pybench compare` command to diff two saved benchmark runs
-- CLI with auto-discovery of `bench_*.py` / `*_bench.py` files
-- Optional Rich support for formatted tables
-
-## Installation
-
-```bash
-pip install pybench
-
-# With optional Rich support
-pip install pybench[rich]
-```
-
-## Quick Start
-
-```python
-from pybench import Bench
-
-bench = Bench()
-
-@bench.benchmark
-def my_function():
-    sorted(range(1000))
-
-bench.report()
-```
-
-### CLI
-
-```bash
-# Run benchmarks in a directory
-pybench run ./benchmarks
-
-# Save results to JSON
-pybench run ./benchmarks --save baseline.json
-
-# Compare two runs
-pybench compare baseline.json current.json
-```

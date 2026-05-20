@@ -11,13 +11,14 @@ from pybench._pybench import (
     compare,
 )
 
+# Runner is importable for advanced users (Bench is the supported entry point)
+# but not in __all__ — it is not part of the v1.0 stability contract.
 __all__ = [
     "Bench",
     "BenchmarkResult",
     "ComparisonReport",
     "DiffRow",
     "HdrHistogram",
-    "Runner",
     "benchmark",
     "black_box",
     "compare",

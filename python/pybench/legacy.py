@@ -25,5 +25,9 @@ class Bench(_Bench):
     ):
         super().__init__(warmup=warmup, iterations=iterations, target_time_ns=target_time_ns)
 
+    def report(self, json_output: bool = False) -> None:  # type: ignore[override]
+        """v0.1.0-shaped report: `json_output=True` selects the JSON formatter."""
+        super().report(format="json" if json_output else "table")
+
 
 __all__ = ["Bench", "BenchmarkResult", "benchmark"]

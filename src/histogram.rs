@@ -49,11 +49,17 @@ impl HdrHistogram {
     }
 }
 
+const HISTOGRAM_MAX_NS: u64 = 60_000_000_000;
+
 impl HdrHistogram {
     pub fn from_samples(samples: &[i64]) -> Self {
-        let mut h = Histogram::<u64>::new_with_bounds(1, 60_000_000_000, 3).unwrap();
+        let mut h = Histogram::<u64>::new_with_bounds(1, HISTOGRAM_MAX_NS, 3).unwrap();
         for &s in samples {
-            let _ = h.record(s.max(1) as u64);
+            // Saturate to the histogram's max bound so samples above 60s are
+            // bucketed at the ceiling rather than silently dropped. With the
+            // clamp `record` can no longer fail for finite inputs.
+            let clamped = (s.max(1) as u64).min(HISTOGRAM_MAX_NS);
+            h.record(clamped).expect("clamped value is within histogram bounds");
         }
         Self { inner: h }
     }

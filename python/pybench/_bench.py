@@ -85,7 +85,10 @@ class Bench:
         return IterBatched(setup, routine)
 
     def run(self) -> list[BenchmarkResult]:
-        results = list(self._results)
+        # Assign self._results before each loop iteration so partial results
+        # survive an exception from a later benchmark; on failure the user
+        # can call bench.report() on what completed.
+        self._results = list(self._results)
         cached_overhead_ns: float | None = None
         for name, fn, opts in self._registered:
             runner = self._make_runner(opts, cached_overhead_ns)
@@ -95,17 +98,16 @@ class Bench:
             if "params" in opts:
                 for p in opts["params"]:
                     fn_p = (lambda f=fn, p=p: f(p))
-                    results.append(runner.run(f"{name}[{p}]", fn_p, throughput, p))
+                    self._results.append(runner.run(f"{name}[{p}]", fn_p, throughput, p))
                 continue
-            probe = fn()
-            if isinstance(probe, IterBatched):
-                results.append(
-                    runner.run_iter_batched(name, probe.setup, probe.routine, throughput, None)
+            ret = fn()
+            if isinstance(ret, IterBatched):
+                self._results.append(
+                    runner.run_iter_batched(name, ret.setup, ret.routine, throughput, None)
                 )
             else:
-                results.append(runner.run(name, fn, throughput, None))
-        self._results = results
-        return results
+                self._results.append(runner.run(name, fn, throughput, None))
+        return self._results
 
     def to_table(self) -> str:
         if not self._results:

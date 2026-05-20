@@ -189,6 +189,35 @@ def test_report_unknown_format_raises():
         bench.report(format="bogus")
 
 
+def test_partial_results_survive_benchmark_exception():
+    """When a later benchmark raises, the earlier completed results stay on
+    self._results so the user can call .report() / .to_json() on what ran."""
+    bench = pybench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def ok():
+        pass
+
+    @bench.benchmark
+    def broken():
+        raise RuntimeError("boom")
+
+    import pytest
+
+    with pytest.raises(RuntimeError, match="boom"):
+        bench.run()
+
+    names = [r.name for r in bench._results]
+    assert "ok" in names
+    assert "broken" not in names
+
+
+def test_runner_not_in_public_all():
+    """Runner is importable but not part of the stability contract."""
+    assert "Runner" not in pybench.__all__
+    assert hasattr(pybench, "Runner")  # still importable for advanced users
+
+
 def test_iter_batched_with_warmup_runs_setup_in_warmup_phase():
     bench = pybench.Bench(warmup=2, iterations=3, target_time_ns=10_000_000)
     setup_calls = [0]

@@ -27,3 +27,35 @@ def test_legacy_bench_decorator_still_works():
     results = bench.run()
     assert results[0].name == "f"
     assert "mean_ns" in results[0].to_dict()
+
+
+def test_legacy_report_accepts_json_output(capsys):
+    """v0.1.0 callers using `bench.report(json_output=True)` must still work."""
+    import json as _json
+
+    from pybench import legacy
+
+    bench = legacy.Bench(warmup=0, iterations=3)
+
+    @bench.benchmark
+    def f():
+        pass
+
+    bench.run()
+    bench.report(json_output=True)
+    data = _json.loads(capsys.readouterr().out)
+    assert data["results"][0]["name"] == "f"
+
+
+def test_legacy_report_default_is_table(capsys):
+    from pybench import legacy
+
+    bench = legacy.Bench(warmup=0, iterations=3)
+
+    @bench.benchmark
+    def g():
+        pass
+
+    bench.run()
+    bench.report()
+    assert "Name" in capsys.readouterr().out

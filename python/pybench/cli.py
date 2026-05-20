@@ -3,12 +3,31 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import os
 import shutil
 import subprocess
 import sys
+import tempfile
+import textwrap
 from pathlib import Path
 
 from pybench._bench import Bench, _global_registry
+
+
+# Pre-baked profiling harness. The benchmark path + function name are passed as
+# env vars (not interpolated into source) so a malicious benchmark file with
+# special characters in its name cannot inject Python into the subprocess.
+_PROFILE_HARNESS = textwrap.dedent(
+    """
+    import importlib.util, os
+    path = os.environ["PYBENCH_PATH"]
+    name = os.environ["PYBENCH_NAME"]
+    spec = importlib.util.spec_from_file_location("m", path)
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    getattr(m, name)()
+    """
+).strip()
 
 
 def _discover(path: Path) -> list[tuple[str, callable, dict]]:
@@ -18,11 +37,14 @@ def _discover(path: Path) -> list[tuple[str, callable, dict]]:
         files = sorted(list(path.glob("bench_*.py")) + list(path.glob("*_bench.py")))
     _global_registry.clear()
     for f in files:
-        spec = importlib.util.spec_from_file_location(f.stem, f)
-        if spec and spec.loader:
-            mod = importlib.util.module_from_spec(spec)
-            sys.modules[f.stem] = mod
-            spec.loader.exec_module(mod)
+        try:
+            spec = importlib.util.spec_from_file_location(f.stem, f)
+            if spec and spec.loader:
+                mod = importlib.util.module_from_spec(spec)
+                sys.modules[f.stem] = mod
+                spec.loader.exec_module(mod)
+        except Exception as e:
+            print(f"warning: skipping {f}: {e}", file=sys.stderr)
     return list(_global_registry)
 
 
@@ -45,20 +67,26 @@ def _cmd_run(args: argparse.Namespace) -> int:
         if not shutil.which("py-spy"):
             print("py-spy not found on PATH. Install with: pip install py-spy", file=sys.stderr)
             return 2
-        for name, _fn, _opts in benchmarks:
-            svg = Path(f"{name}.svg")
-            cmd = [
-                "py-spy", "record", "-o", str(svg), "--",
-                sys.executable, "-c",
-                f"import importlib.util,sys;"
-                f"spec=importlib.util.spec_from_file_location('m','{args.path}');"
-                f"m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);"
-                f"m.{name}()",
-            ]
+        with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as fp:
+            fp.write(_PROFILE_HARNESS)
+            harness_path = fp.name
+        try:
+            for name, _fn, _opts in benchmarks:
+                svg = Path(f"{name}.svg")
+                cmd = [
+                    "py-spy", "record", "-o", str(svg), "--",
+                    sys.executable, harness_path,
+                ]
+                env = {**os.environ, "PYBENCH_PATH": str(args.path), "PYBENCH_NAME": name}
+                try:
+                    subprocess.run(cmd, check=False, timeout=300, env=env)
+                except subprocess.TimeoutExpired:
+                    print(f"py-spy timed out (>300s) profiling {name}", file=sys.stderr)
+        finally:
             try:
-                subprocess.run(cmd, check=False, timeout=300)
-            except subprocess.TimeoutExpired:
-                print(f"py-spy timed out (>300s) profiling {name}", file=sys.stderr)
+                os.unlink(harness_path)
+            except OSError:
+                pass
     bench = Bench(
         warmup=args.warmup,
         target_time_ns=args.target_time_ns,

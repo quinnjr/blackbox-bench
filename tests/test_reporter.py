@@ -65,17 +65,17 @@ def test_to_table_empty_results():
     assert "No benchmark results" in out
 
 
-def test_fmt_time_units(tmp_path):
-    import time
+def test_fmt_time_units_renders_milliseconds():
+    """The table renders the right unit tier without needing a real sleep."""
+    from pybench._pybench import _synthesize
 
-    bench = pybench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000)
-
-    @bench.benchmark
-    def slow():
-        time.sleep(0.001)
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    # 5 ms — well into the ms tier.
+    bench._results.append(_synthesize("slow", 5_000_000))
 
     out = bench.to_table()
-    assert ("µs" in out) or ("ms" in out) or ("s" in out and " ns" not in out.split("\n")[3])
+    assert "ms" in out
+    assert "slow" in out
 
 
 def test_json_str_escapes_in_name():

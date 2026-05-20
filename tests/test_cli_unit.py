@@ -130,16 +130,19 @@ def test_main_run_profile_with_pyspy_invokes_subprocess(tmp_path, capsys, monkey
     calls: list[list[str]] = []
     monkeypatch.setattr(
         cli.subprocess, "run",
-        lambda cmd, check=False, timeout=None: calls.append(cmd) or None,
+        lambda cmd, check=False, timeout=None, env=None: calls.append((cmd, env)) or None,
     )
     rc = cli.main(["run", "bench_sample.py", "--warmup", "0", "--iterations", "2", "--profile"])
     assert rc == 0
     # Exactly one py-spy invocation per registered benchmark (here: "f").
     assert len(calls) == 1
-    cmd = calls[0]
+    cmd, env = calls[0]
     assert cmd[0:3] == ["py-spy", "record", "-o"]
     assert cmd[3] == "f.svg"
     assert "--" in cmd
+    # The harness path is a *.py file we wrote; the bench name flows via env.
+    assert cmd[-1].endswith(".py")
+    assert env["PYBENCH_NAME"] == "f"
 
 
 def test_main_compare_default_table_to_stdout(tmp_path, capsys, monkeypatch):

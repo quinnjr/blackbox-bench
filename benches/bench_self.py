@@ -130,31 +130,37 @@ def measure_context_manager():
 
 # ---------- Public reporter throughput (uses a fully-built Bench) ----------
 
+from pybench._pybench import _synthesize
+
+
 def _populated_bench():
     """Build a Bench with 5 synthesised single-sample results — no timing involved."""
-    from pybench._pybench import _synthesize
-
     b = pybench.Bench(warmup=0, target_time_ns=1, overhead_subtract=False)
     for i in range(5):
         b._results.append(_synthesize(f"row_{i}", 1_000 + i))
     return b
 
 
+# Reporter benchmarks via iter_batched: setup builds a fresh populated Bench
+# (untimed), routine calls the reporter (timed). Without this, the timed loop
+# would include the bench construction + 5 _synthesize calls (~250 µs of
+# noise) and dwarf the reporter call itself.
+
 @pybench.benchmark
 def report_to_table():
-    _populated_bench().to_table()
+    return IterBatched(setup=_populated_bench, routine=lambda b: b.to_table())
 
 
 @pybench.benchmark
 def report_to_json():
-    _populated_bench().to_json()
+    return IterBatched(setup=_populated_bench, routine=lambda b: b.to_json())
 
 
 @pybench.benchmark
 def report_to_html():
-    _populated_bench().to_html()
+    return IterBatched(setup=_populated_bench, routine=lambda b: b.to_html())
 
 
 @pybench.benchmark
 def report_to_xml_junit():
-    _populated_bench().to_xml()
+    return IterBatched(setup=_populated_bench, routine=lambda b: b.to_xml())

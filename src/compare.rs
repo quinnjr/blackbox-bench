@@ -74,10 +74,16 @@ pub fn compare(
 ) -> PyResult<ComparisonReport> {
     let json_mod = py.import_bound("json")?;
     let loads = json_mod.getattr("loads")?;
-    let baseline = loads.call1((baseline_json,))?;
-    let current = loads.call1((current_json,))?;
-    let b_rows = extract_rows(&baseline)?;
-    let c_rows = extract_rows(&current)?;
+    let baseline = loads
+        .call1((baseline_json,))
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("baseline: {e}")))?;
+    let current = loads
+        .call1((current_json,))
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("current: {e}")))?;
+    let b_rows = extract_rows(&baseline)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("baseline: {e}")))?;
+    let c_rows = extract_rows(&current)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("current: {e}")))?;
     let mut by_name: HashMap<String, ResultRow> =
         c_rows.into_iter().map(|r| (r.name.clone(), r)).collect();
     let mut out: Vec<Py<DiffRow>> = Vec::new();

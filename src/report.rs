@@ -79,7 +79,7 @@ fn json_str(s: &str) -> String {
     out
 }
 
-fn html_escape(s: &str) -> String {
+fn escape_entities(s: &str, apos: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
@@ -87,11 +87,15 @@ fn html_escape(s: &str) -> String {
             '<' => out.push_str("&lt;"),
             '>' => out.push_str("&gt;"),
             '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&#39;"),
+            '\'' => out.push_str(apos),
             c => out.push(c),
         }
     }
     out
+}
+
+fn html_escape(s: &str) -> String {
+    escape_entities(s, "&#39;")
 }
 
 fn sparkline_svg(samples: &[i64]) -> String {
@@ -196,18 +200,13 @@ pub fn format_html_refs(results: &[&BenchmarkResult], metadata: &str) -> String 
 }
 
 fn xml_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            '\'' => out.push_str("&apos;"),
-            c => out.push(c),
-        }
-    }
-    out
+    escape_entities(s, "&apos;")
+}
+
+/// CDATA sections terminate at `]]>`. Splitting the trigraph as `]]]]><![CDATA[>`
+/// preserves the literal text while reopening a fresh CDATA section.
+fn cdata_safe(s: &str) -> String {
+    s.replace("]]>", "]]]]><![CDATA[>")
 }
 
 pub fn format_xml_refs(results: &[&BenchmarkResult], style: &str) -> String {
@@ -242,7 +241,7 @@ fn format_xml_junit(results: &[&BenchmarkResult]) -> String {
             r.mean_ns / 1_000_000_000.0,
         ));
         s.push_str("    <system-out><![CDATA[");
-        s.push_str(&result_to_json_inline(r));
+        s.push_str(&cdata_safe(&result_to_json_inline(r)));
         s.push_str("]]></system-out>\n");
         s.push_str("  </testcase>\n");
     }
@@ -432,10 +431,6 @@ pub fn _format_results_html(results: Vec<PyRef<BenchmarkResult>>, metadata: &str
 pub fn _format_results_xml(results: Vec<PyRef<BenchmarkResult>>, style: &str) -> String {
     format_xml_refs(&as_refs(&results), style)
 }
-
-// Helpers that take &[&BenchmarkResult] (the form PyRef gives us). The
-// non-ref variants above still exist for the unit-test path that has
-// owned BenchmarkResult values directly.
 
 pub fn format_table_refs(results: &[&BenchmarkResult]) -> String {
     if results.is_empty() {

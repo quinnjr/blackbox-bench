@@ -79,6 +79,13 @@ def test_runner_invalid_outlier_method_raises():
         pybench.Runner(warmup=0, iterations=3, outlier_method="bogus")
 
 
+def test_runner_iterations_zero_raises():
+    import pytest
+
+    with pytest.raises(ValueError, match="iterations"):
+        pybench.Runner(warmup=0, iterations=0)
+
+
 def test_runner_iterations_none_uses_target_time_budget():
     """iterations=None should auto-estimate samples to fit target_time_ns."""
     # 5ms budget with calibration's 5µs minimum batch => somewhere in [10, ~1000]

@@ -148,6 +148,18 @@ def test_compare_payload_not_object_raises():
         pybench.compare("[]", json.dumps({"results": []}))
 
 
+def test_compare_error_identifies_baseline_vs_current():
+    import pytest
+
+    # Malformed baseline → error message mentions "baseline"
+    with pytest.raises(ValueError, match="baseline"):
+        pybench.compare("not json at all", json.dumps({"results": []}))
+
+    # Malformed current → error message mentions "current"
+    with pytest.raises(ValueError, match="current"):
+        pybench.compare(json.dumps({"results": []}), "not json at all")
+
+
 def test_compare_row_not_object_raises():
     import pytest
 

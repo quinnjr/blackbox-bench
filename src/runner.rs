@@ -208,6 +208,11 @@ impl Runner {
         histogram: bool,
         overhead_ns: Option<f64>,
     ) -> PyResult<Self> {
+        if matches!(iterations, Some(0)) {
+            return Err(pyo3::exceptions::PyValueError::new_err(
+                "iterations must be >= 1",
+            ));
+        }
         let outlier_method = match outlier_method {
             "tukey" => OutlierMethod::Tukey,
             "mad" => OutlierMethod::Mad,

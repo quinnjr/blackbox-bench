@@ -103,6 +103,24 @@ def test_html_escape_special_chars_in_name():
     assert "&#39;" in html
 
 
+def test_xml_cdata_safe_against_terminator_in_payload():
+    """A benchmark name containing ']]>' must not terminate the CDATA section."""
+    import xml.etree.ElementTree as ET
+
+    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+
+    @bench.benchmark(name="foo]]>bar")
+    def f():
+        pass
+
+    xml = bench.to_xml()
+    # If CDATA were broken, ET.fromstring would either raise or parse extra elements
+    tree = ET.fromstring(xml)
+    cases = tree.findall("testcase")
+    assert len(cases) == 1
+    assert cases[0].get("name") == "foo]]>bar"
+
+
 def test_xml_escape_special_chars_in_name():
     bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
 

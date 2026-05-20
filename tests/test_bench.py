@@ -44,6 +44,19 @@ def test_module_level_benchmark_decorator():
     assert any(name == "h" for name, _, _ in pybench._bench._global_registry)
 
 
+def test_parameterized_benchmark_records_param():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark(params=[10, 100, 1000])
+    def hashing(n):
+        b"x" * n
+
+    results = bench.run()
+    assert len(results) == 3
+    assert [r.param for r in results] == [10, 100, 1000]
+    assert [r.name for r in results] == ["hashing[10]", "hashing[100]", "hashing[1000]"]
+
+
 def test_throughput_recorded_on_result():
     bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
 

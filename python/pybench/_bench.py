@@ -81,6 +81,11 @@ class Bench:
         for name, fn, opts in self._registered:
             runner = self._make_runner(opts)
             throughput = opts.get("throughput")
+            if "params" in opts:
+                for p in opts["params"]:
+                    fn_p = (lambda f=fn, p=p: f(p))
+                    results.append(runner.run(f"{name}[{p}]", fn_p, throughput, p))
+                continue
             probe = fn()
             if isinstance(probe, IterBatched):
                 results.append(

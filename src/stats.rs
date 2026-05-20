@@ -1,21 +1,26 @@
 //! Stats over `&[i64]` sample vectors. All ns-valued.
+//!
+//! Functions that need a mutable working buffer accept one as `scratch: &mut
+//! Vec<i64>`; the caller owns it and can reuse it across calls so a single
+//! `Vec` allocation covers `median` + `tukey`/`mad` for the whole benchmark.
 
 pub fn mean(xs: &[i64]) -> f64 {
     debug_assert!(!xs.is_empty());
     xs.iter().sum::<i64>() as f64 / xs.len() as f64
 }
 
-pub fn median(xs: &[i64]) -> f64 {
+pub fn median(xs: &[i64], scratch: &mut Vec<i64>) -> f64 {
     debug_assert!(!xs.is_empty());
-    let mut buf = xs.to_vec();
-    let n = buf.len();
+    scratch.clear();
+    scratch.extend_from_slice(xs);
+    let n = scratch.len();
     let mid = n / 2;
-    let (_, hi, _) = buf.select_nth_unstable(mid);
+    let (_, hi, _) = scratch.select_nth_unstable(mid);
     let hi = *hi as f64;
     if n % 2 == 1 {
         hi
     } else {
-        let (_, lo, _) = buf[..mid].select_nth_unstable(mid - 1);
+        let (_, lo, _) = scratch[..mid].select_nth_unstable(mid - 1);
         (hi + *lo as f64) / 2.0
     }
 }
@@ -44,20 +49,25 @@ pub enum OutlierMethod {
     None,
 }
 
-/// Returns (clean_mean, outlier_count).
-pub fn detect_outliers(xs: &[i64], method: OutlierMethod) -> (f64, usize) {
+/// Returns (clean_mean, outlier_count). `scratch` is overwritten.
+pub fn detect_outliers(
+    xs: &[i64],
+    method: OutlierMethod,
+    scratch: &mut Vec<i64>,
+) -> (f64, usize) {
     match method {
         OutlierMethod::None => (mean(xs), 0),
-        OutlierMethod::Tukey => tukey(xs),
-        OutlierMethod::Mad => mad(xs),
+        OutlierMethod::Tukey => tukey(xs, scratch),
+        OutlierMethod::Mad => mad(xs, scratch),
     }
 }
 
-fn tukey(xs: &[i64]) -> (f64, usize) {
-    let mut buf = xs.to_vec();
-    let n = buf.len();
-    let q1 = quantile(&mut buf, n / 4);
-    let q3 = quantile(&mut buf, (3 * n) / 4);
+fn tukey(xs: &[i64], scratch: &mut Vec<i64>) -> (f64, usize) {
+    scratch.clear();
+    scratch.extend_from_slice(xs);
+    let n = scratch.len();
+    let q1 = quantile(scratch, n / 4);
+    let q3 = quantile(scratch, (3 * n) / 4);
     let iqr = q3 - q1;
     let lo = q1 - 1.5 * iqr;
     let hi = q3 + 1.5 * iqr;
@@ -73,16 +83,16 @@ fn tukey(xs: &[i64]) -> (f64, usize) {
             clean_n += 1;
         }
     }
-    // Q1 and Q3 are interior quantiles, so at least one sample always survives.
     debug_assert!(clean_n > 0);
     (clean_sum / clean_n as f64, outliers)
 }
 
-fn mad(xs: &[i64]) -> (f64, usize) {
-    let med = median(xs);
-    let mut deviations: Vec<i64> = xs.iter().map(|&x| (x as f64 - med).abs() as i64).collect();
-    let n = deviations.len();
-    let mad_val = quantile(&mut deviations, n / 2);
+fn mad(xs: &[i64], scratch: &mut Vec<i64>) -> (f64, usize) {
+    let med = median(xs, scratch);
+    scratch.clear();
+    scratch.extend(xs.iter().map(|&x| (x as f64 - med).abs() as i64));
+    let n = scratch.len();
+    let mad_val = quantile(scratch, n / 2);
     let threshold = 3.5 * mad_val;
     let mut clean_sum = 0.0;
     let mut clean_n = 0usize;
@@ -95,7 +105,6 @@ fn mad(xs: &[i64]) -> (f64, usize) {
             clean_n += 1;
         }
     }
-    // The median itself is never an outlier from itself, so at least one sample survives.
     debug_assert!(clean_n > 0);
     (clean_sum / clean_n as f64, outliers)
 }
@@ -106,33 +115,35 @@ fn quantile(buf: &mut [i64], k: usize) -> f64 {
     *v as f64
 }
 
-/// Percentile bootstrap CI for the mean.
+/// Percentile bootstrap CI for the mean. `means_scratch` is overwritten and
+/// must outlive the caller — reuse it across benchmarks to avoid 80KB of
+/// allocator churn per call.
 pub fn bootstrap_ci_mean(
     xs: &[i64],
     level: f64,
     n_resamples: usize,
     rng: &mut fastrand::Rng,
+    means_scratch: &mut Vec<f64>,
 ) -> (f64, f64) {
     debug_assert!(!xs.is_empty());
     debug_assert!(level > 0.0 && level < 1.0);
     let n = xs.len();
-    let mut means: Vec<f64> = Vec::with_capacity(n_resamples);
+    means_scratch.clear();
+    means_scratch.reserve(n_resamples);
     for _ in 0..n_resamples {
         let mut sum: i64 = 0;
         for _ in 0..n {
             sum += xs[rng.usize(..n)];
         }
-        means.push(sum as f64 / n as f64);
+        means_scratch.push(sum as f64 / n as f64);
     }
     let alpha = (1.0 - level) / 2.0;
     let lo_idx = (alpha * n_resamples as f64) as usize;
     let hi_idx = (((1.0 - alpha) * n_resamples as f64) as usize).min(n_resamples - 1);
-    // Partial-partition twice: O(n) instead of the O(n log n) we'd pay for a
-    // full sort, since we only need two order statistics.
     let cmp = |a: &f64, b: &f64| a.partial_cmp(b).unwrap();
-    let (_, lo, _) = means.select_nth_unstable_by(lo_idx, cmp);
+    let (_, lo, _) = means_scratch.select_nth_unstable_by(lo_idx, cmp);
     let lo_value = *lo;
-    let (_, hi, _) = means.select_nth_unstable_by(hi_idx, cmp);
+    let (_, hi, _) = means_scratch.select_nth_unstable_by(hi_idx, cmp);
     (lo_value, *hi)
 }
 
@@ -147,12 +158,14 @@ mod tests {
 
     #[test]
     fn median_odd() {
-        assert_eq!(median(&[1, 2, 3, 4, 5]), 3.0);
+        let mut s = Vec::new();
+        assert_eq!(median(&[1, 2, 3, 4, 5], &mut s), 3.0);
     }
 
     #[test]
     fn median_even() {
-        assert_eq!(median(&[1, 2, 3, 4]), 2.5);
+        let mut s = Vec::new();
+        assert_eq!(median(&[1, 2, 3, 4], &mut s), 2.5);
     }
 
     #[test]
@@ -169,7 +182,8 @@ mod tests {
     #[test]
     fn tukey_flags_obvious_outlier() {
         let xs: Vec<i64> = (10..30).chain(std::iter::once(10_000)).collect();
-        let (clean, n) = detect_outliers(&xs, OutlierMethod::Tukey);
+        let mut s = Vec::new();
+        let (clean, n) = detect_outliers(&xs, OutlierMethod::Tukey, &mut s);
         assert_eq!(n, 1);
         assert!(clean < 30.0);
     }
@@ -179,7 +193,20 @@ mod tests {
         let mut rng = fastrand::Rng::with_seed(0xDEAD_BEEF);
         let xs: Vec<i64> = (0..1000).collect();
         let m = mean(&xs);
-        let (lo, hi) = bootstrap_ci_mean(&xs, 0.95, 1000, &mut rng);
+        let mut means = Vec::new();
+        let (lo, hi) = bootstrap_ci_mean(&xs, 0.95, 1000, &mut rng, &mut means);
         assert!(lo <= m && m <= hi, "CI [{lo}, {hi}] should contain mean {m}");
+    }
+
+    #[test]
+    fn scratch_buffer_can_be_reused_across_calls() {
+        let xs1: Vec<i64> = (0..50).collect();
+        let xs2: Vec<i64> = (100..200).collect();
+        let mut scratch = Vec::new();
+
+        let m1 = median(&xs1, &mut scratch);
+        let m2 = median(&xs2, &mut scratch);
+        assert_eq!(m1, 24.5);
+        assert_eq!(m2, 149.5);
     }
 }

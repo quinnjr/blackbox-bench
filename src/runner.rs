@@ -91,11 +91,13 @@ impl BenchmarkResult {
         param: Option<PyObject>,
         histogram: Option<Py<HdrHistogram>>,
         rng: &mut fastrand::Rng,
+        samples_scratch: &mut Vec<i64>,
+        means_scratch: &mut Vec<f64>,
     ) -> Self {
         let iterations = times_ns.len();
         debug_assert!(iterations > 0, "from_times must be called with at least one sample");
         let mean_ns = stats::mean(&times_ns);
-        let median_ns = stats::median(&times_ns);
+        let median_ns = stats::median(&times_ns, samples_scratch);
         let stddev_ns = stats::stddev(&times_ns);
         let min_ns = *times_ns.iter().min().unwrap();
         let max_ns = *times_ns.iter().max().unwrap();
@@ -104,9 +106,15 @@ impl BenchmarkResult {
         } else {
             f64::INFINITY
         };
-        let (clean_mean_ns, outliers) = stats::detect_outliers(&times_ns, outlier_method);
-        let (ci95_low_ns, ci95_high_ns) =
-            stats::bootstrap_ci_mean(&times_ns, confidence_level, BOOTSTRAP_RESAMPLES, rng);
+        let (clean_mean_ns, outliers) =
+            stats::detect_outliers(&times_ns, outlier_method, samples_scratch);
+        let (ci95_low_ns, ci95_high_ns) = stats::bootstrap_ci_mean(
+            &times_ns,
+            confidence_level,
+            BOOTSTRAP_RESAMPLES,
+            rng,
+            means_scratch,
+        );
         let throughput_per_sec = throughput.map(|bytes| bytes * ops_per_sec);
         Self {
             name,
@@ -156,6 +164,11 @@ pub struct Runner {
     overhead_ns: f64,
     histogram: bool,
     rng: fastrand::Rng,
+    /// Scratch buffer for median / Tukey / MAD: reused across benchmarks so
+    /// a `Bench.run()` over N benches allocates one Vec instead of N.
+    samples_scratch: Vec<i64>,
+    /// Scratch buffer for bootstrap_ci_mean (10k f64s = 80 KB).
+    means_scratch: Vec<f64>,
 }
 
 #[pymethods]
@@ -211,6 +224,8 @@ impl Runner {
             overhead_ns,
             histogram,
             rng,
+            samples_scratch: Vec::new(),
+            means_scratch: Vec::with_capacity(BOOTSTRAP_RESAMPLES),
         })
     }
 
@@ -240,16 +255,26 @@ impl Runner {
         } else {
             None
         };
+        let Runner {
+            ref mut rng,
+            ref mut samples_scratch,
+            ref mut means_scratch,
+            confidence_level,
+            outlier_method,
+            ..
+        } = *self;
         Ok(BenchmarkResult::from_times(
             name,
             times,
             batch_size,
-            self.confidence_level,
-            self.outlier_method,
+            confidence_level,
+            outlier_method,
             throughput,
             param,
             histogram,
-            &mut self.rng,
+            rng,
+            samples_scratch,
+            means_scratch,
         ))
     }
 
@@ -296,16 +321,26 @@ impl Runner {
         } else {
             None
         };
+        let Runner {
+            ref mut rng,
+            ref mut samples_scratch,
+            ref mut means_scratch,
+            confidence_level,
+            outlier_method,
+            ..
+        } = *self;
         Ok(BenchmarkResult::from_times(
             name,
             times,
             batch_size,
-            self.confidence_level,
-            self.outlier_method,
+            confidence_level,
+            outlier_method,
             throughput,
             param,
             histogram,
-            &mut self.rng,
+            rng,
+            samples_scratch,
+            means_scratch,
         ))
     }
 }
@@ -382,6 +417,8 @@ fn call_routine_batch_ptr(
 #[pyfunction]
 pub fn _synthesize(name: String, elapsed_ns: i64) -> BenchmarkResult {
     let mut rng = fastrand::Rng::with_seed(0);
+    let mut samples_scratch = Vec::new();
+    let mut means_scratch = Vec::new();
     BenchmarkResult::from_times(
         name,
         vec![elapsed_ns],
@@ -392,6 +429,8 @@ pub fn _synthesize(name: String, elapsed_ns: i64) -> BenchmarkResult {
         None,
         None,
         &mut rng,
+        &mut samples_scratch,
+        &mut means_scratch,
     )
 }
 
@@ -411,5 +450,6 @@ fn measure_overhead(py: Python<'_>) -> PyResult<f64> {
         let elapsed = run_batch(py, &noop_obj, 1000)?;
         samples.push((elapsed / 1000) as i64);
     }
-    Ok(stats::median(&samples))
+    let mut scratch = Vec::new();
+    Ok(stats::median(&samples, &mut scratch))
 }

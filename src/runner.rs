@@ -221,11 +221,14 @@ impl Runner {
         })
     }
 
+    #[pyo3(signature = (name, fn_, throughput=None, param=None))]
     fn run(
         &mut self,
         py: Python<'_>,
         name: String,
         fn_: PyObject,
+        throughput: Option<f64>,
+        param: Option<PyObject>,
     ) -> PyResult<BenchmarkResult> {
         let batch_size = self.calibrate(py, &fn_)?;
         for _ in 0..self.warmup {
@@ -245,18 +248,21 @@ impl Runner {
             batch_size,
             self.confidence_level,
             self.outlier_method,
-            None,
-            None,
+            throughput,
+            param,
             &mut self.rng,
         ))
     }
 
+    #[pyo3(signature = (name, setup, routine, throughput=None, param=None))]
     fn run_iter_batched(
         &mut self,
         py: Python<'_>,
         name: String,
         setup: PyObject,
         routine: PyObject,
+        throughput: Option<f64>,
+        param: Option<PyObject>,
     ) -> PyResult<BenchmarkResult> {
         let batch_size = self.calibrate_batched(py, &setup, &routine)?;
         for _ in 0..self.warmup {
@@ -284,8 +290,8 @@ impl Runner {
             batch_size,
             self.confidence_level,
             self.outlier_method,
-            None,
-            None,
+            throughput,
+            param,
             &mut self.rng,
         ))
     }

@@ -80,11 +80,14 @@ class Bench:
         results = list(self._results)
         for name, fn, opts in self._registered:
             runner = self._make_runner(opts)
+            throughput = opts.get("throughput")
             probe = fn()
             if isinstance(probe, IterBatched):
-                results.append(runner.run_iter_batched(name, probe.setup, probe.routine))
+                results.append(
+                    runner.run_iter_batched(name, probe.setup, probe.routine, throughput, None)
+                )
             else:
-                results.append(runner.run(name, fn))
+                results.append(runner.run(name, fn, throughput, None))
         self._results = results
         return results
 

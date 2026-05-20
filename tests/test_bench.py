@@ -44,6 +44,18 @@ def test_module_level_benchmark_decorator():
     assert any(name == "h" for name, _, _ in pybench._bench._global_registry)
 
 
+def test_throughput_recorded_on_result():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark(throughput=1024.0)
+    def hashing():
+        b"x" * 1024
+
+    results = bench.run()
+    assert results[0].throughput_per_sec is not None
+    assert results[0].throughput_per_sec > 0
+
+
 def test_iter_batched_setup_runs_per_sample_not_per_call():
     bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
     setup_calls = [0]

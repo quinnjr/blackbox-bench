@@ -52,7 +52,6 @@ fn layout_table(title: &str, headers: &[&str], rows: &[Vec<String>]) -> String {
 }
 
 fn json_num(x: f64) -> String {
-    // JSON does not allow Infinity / NaN. Emit null in that case.
     if x.is_finite() {
         format!("{x}")
     } else {
@@ -408,28 +407,28 @@ pub fn format_comparison_xml(rows: &[DiffRowView]) -> String {
 
 // --- PyO3 helpers exported to Python -----------------------------------------
 
+fn as_refs<'a>(results: &'a [PyRef<'a, BenchmarkResult>]) -> Vec<&'a BenchmarkResult> {
+    results.iter().map(|r| &**r).collect()
+}
+
 #[pyfunction]
 pub fn _format_results_table(results: Vec<PyRef<BenchmarkResult>>) -> String {
-    let refs: Vec<&BenchmarkResult> = results.iter().map(|r| &**r).collect();
-    format_table_refs(&refs)
+    format_table_refs(&as_refs(&results))
 }
 
 #[pyfunction]
 pub fn _format_results_json(results: Vec<PyRef<BenchmarkResult>>, metadata: &str) -> String {
-    let refs: Vec<&BenchmarkResult> = results.iter().map(|r| &**r).collect();
-    format_json_refs(&refs, metadata)
+    format_json_refs(&as_refs(&results), metadata)
 }
 
 #[pyfunction]
 pub fn _format_results_html(results: Vec<PyRef<BenchmarkResult>>, metadata: &str) -> String {
-    let refs: Vec<&BenchmarkResult> = results.iter().map(|r| &**r).collect();
-    format_html_refs(&refs, metadata)
+    format_html_refs(&as_refs(&results), metadata)
 }
 
 #[pyfunction]
 pub fn _format_results_xml(results: Vec<PyRef<BenchmarkResult>>, style: &str) -> String {
-    let refs: Vec<&BenchmarkResult> = results.iter().map(|r| &**r).collect();
-    format_xml_refs(&refs, style)
+    format_xml_refs(&as_refs(&results), style)
 }
 
 // Helpers that take &[&BenchmarkResult] (the form PyRef gives us). The

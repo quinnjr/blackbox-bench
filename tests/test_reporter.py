@@ -61,37 +61,31 @@ def test_to_xml_default_is_junit_compatible():
 
 def test_to_table_empty_results():
     bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
-    # No benchmarks registered — results stays empty.
     out = bench.to_table()
     assert "No benchmark results" in out
 
 
 def test_fmt_time_units(tmp_path):
-    """Benchmark something slow enough to render in larger units."""
     import time
 
     bench = pybench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000)
 
     @bench.benchmark
     def slow():
-        time.sleep(0.001)  # 1ms
+        time.sleep(0.001)
 
     out = bench.to_table()
-    # Should render in ms range
     assert ("µs" in out) or ("ms" in out) or ("s" in out and " ns" not in out.split("\n")[3])
 
 
 def test_json_str_escapes_in_name():
-    """Bench name with characters that exercise json_str's escape paths."""
     bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
 
     @bench.benchmark(name='quoted"\\back\nnewline\ttab\x01ctrl')
     def f():
         pass
 
-    raw = bench.to_json()
-    # Just check the JSON parses (escaping is correct) and the name is preserved
-    data = json.loads(raw)
+    data = json.loads(bench.to_json())
     assert data["results"][0]["name"] == 'quoted"\\back\nnewline\ttab\x01ctrl'
 
 

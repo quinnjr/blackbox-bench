@@ -6,16 +6,7 @@ import pytest
 
 from pybench import cli
 
-
-def _write_bench(tmp_path: Path) -> Path:
-    p = tmp_path / "bench_sample.py"
-    p.write_text(
-        "import pybench\n"
-        "@pybench.benchmark\n"
-        "def f():\n"
-        "    sum(range(10))\n"
-    )
-    return p
+from .test_cli import _write_bench
 
 
 def test_main_run_default_table_to_stdout(tmp_path, capsys, monkeypatch):

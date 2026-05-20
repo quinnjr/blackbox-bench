@@ -54,21 +54,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
     for name, fn, opts in benchmarks:
         bench._registered.append((name, fn, opts))
     bench.run()
-
-    if args.format == "table":
-        text = bench.to_table()
-    elif args.format == "json":
-        text = bench.to_json()
-    elif args.format == "html":
-        text = bench.to_html()
-    else:
-        text = bench.to_xml(style=args.xml_style)
-
-    if args.output:
-        Path(args.output).write_text(text)
-    else:
-        print(text)
-
+    bench.report(format=args.format, path=args.output, xml_style=args.xml_style)
     if args.save:
         Path(args.save).write_text(bench.to_json())
     return 0

@@ -1,8 +1,8 @@
-import pybench
+import blackbox_bench
 
 
 def test_runner_produces_result_with_required_fields():
-    runner = pybench.Runner(warmup=2, target_time_ns=20_000_000)
+    runner = blackbox_bench.Runner(warmup=2, target_time_ns=20_000_000)
 
     def noop():
         pass
@@ -23,7 +23,7 @@ def test_runner_produces_result_with_required_fields():
 
 
 def test_runner_batch_size_grows_for_fast_functions():
-    runner = pybench.Runner(warmup=1, target_time_ns=20_000_000)
+    runner = blackbox_bench.Runner(warmup=1, target_time_ns=20_000_000)
 
     def trivial():
         pass
@@ -33,7 +33,7 @@ def test_runner_batch_size_grows_for_fast_functions():
 
 
 def test_runner_overhead_subtract_false_skips_overhead_probe():
-    runner = pybench.Runner(
+    runner = blackbox_bench.Runner(
         warmup=0, iterations=3, target_time_ns=10_000_000,
         overhead_subtract=False, seed=42,
     )
@@ -46,7 +46,7 @@ def test_runner_overhead_subtract_false_skips_overhead_probe():
 
 
 def test_runner_outlier_method_none():
-    runner = pybench.Runner(
+    runner = blackbox_bench.Runner(
         warmup=0, iterations=10, target_time_ns=10_000_000,
         outlier_method="none",
     )
@@ -60,7 +60,7 @@ def test_runner_outlier_method_none():
 
 
 def test_runner_outlier_method_mad():
-    runner = pybench.Runner(
+    runner = blackbox_bench.Runner(
         warmup=0, iterations=10, target_time_ns=10_000_000,
         outlier_method="mad",
     )
@@ -76,20 +76,20 @@ def test_runner_invalid_outlier_method_raises():
     import pytest
 
     with pytest.raises(ValueError, match="outlier_method"):
-        pybench.Runner(warmup=0, iterations=3, outlier_method="bogus")
+        blackbox_bench.Runner(warmup=0, iterations=3, outlier_method="bogus")
 
 
 def test_runner_iterations_zero_raises():
     import pytest
 
     with pytest.raises(ValueError, match="iterations"):
-        pybench.Runner(warmup=0, iterations=0)
+        blackbox_bench.Runner(warmup=0, iterations=0)
 
 
 def test_runner_iterations_none_uses_target_time_budget():
     """iterations=None should auto-estimate samples to fit target_time_ns."""
     # 5ms budget with calibration's 5µs minimum batch => somewhere in [10, ~1000]
-    runner = pybench.Runner(warmup=0, target_time_ns=5_000_000)
+    runner = blackbox_bench.Runner(warmup=0, target_time_ns=5_000_000)
 
     def noop():
         pass
@@ -101,7 +101,7 @@ def test_runner_iterations_none_uses_target_time_budget():
 
 def test_runner_iter_batched_returns_result():
     """Cover Runner.run_iter_batched directly (vs through Bench.run)."""
-    runner = pybench.Runner(warmup=0, iterations=3, target_time_ns=10_000_000)
+    runner = blackbox_bench.Runner(warmup=0, iterations=3, target_time_ns=10_000_000)
 
     def setup():
         return [3, 1, 2]
@@ -115,7 +115,7 @@ def test_runner_iter_batched_returns_result():
 
 
 def test_benchmark_result_repr():
-    runner = pybench.Runner(warmup=0, iterations=3, target_time_ns=10_000_000)
+    runner = blackbox_bench.Runner(warmup=0, iterations=3, target_time_ns=10_000_000)
 
     def noop():
         pass
@@ -126,7 +126,7 @@ def test_benchmark_result_repr():
 
 
 def test_benchmark_result_to_dict_round_trip():
-    runner = pybench.Runner(warmup=0, iterations=3, target_time_ns=10_000_000)
+    runner = blackbox_bench.Runner(warmup=0, iterations=3, target_time_ns=10_000_000)
 
     def noop():
         pass
@@ -151,7 +151,7 @@ def test_runner_respects_warmup():
     def counted():
         calls[0] += 1
 
-    runner = pybench.Runner(warmup=7, iterations=3, target_time_ns=10_000_000)
+    runner = blackbox_bench.Runner(warmup=7, iterations=3, target_time_ns=10_000_000)
     r = runner.run("counted", counted)
     assert r.iterations == 3
     # 7 warmup batches + 3 sample batches of size >= 1 each

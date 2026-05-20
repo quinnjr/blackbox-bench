@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from pybench import cli
+from blackbox_bench import cli
 
 from .test_cli import _write_bench
 
@@ -53,7 +53,7 @@ def test_main_run_xml_format_raw(tmp_path, capsys, monkeypatch):
         "--format", "xml", "--xml-style", "raw",
     ])
     assert rc == 0
-    assert "<pybench>" in capsys.readouterr().out
+    assert "<blackbox-bench>" in capsys.readouterr().out
 
 
 def test_main_run_output_flag_writes_file(tmp_path, monkeypatch):
@@ -101,8 +101,8 @@ def test_main_run_directory_discovers_bench_files(tmp_path, capsys, monkeypatch)
 
 def test_main_run_underscore_bench_suffix_discovered(tmp_path, capsys, monkeypatch):
     (tmp_path / "thing_bench.py").write_text(
-        "import pybench\n"
-        "@pybench.benchmark\n"
+        "import blackbox_bench\n"
+        "@blackbox_bench.benchmark\n"
         "def g():\n"
         "    pass\n"
     )

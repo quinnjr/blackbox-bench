@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterator
 
-from pybench._pybench import (
+from blackbox_bench._blackbox_bench import (
     BenchmarkResult,
     IterBatched,
     Runner,
@@ -23,7 +23,7 @@ _global_registry: list[tuple[str, Callable[..., Any], dict[str, Any]]] = []
 # every to_json()/to_html() call doesn't pay platform-module lookup costs.
 _PYTHON_VERSION = platform.python_version()
 _PLATFORM_SYSTEM = platform.system()
-_PYBENCH_VERSION = "1.0.0"
+_BLACKBOX_BENCH_VERSION = "1.0.0"
 
 
 class Bench:
@@ -128,7 +128,7 @@ class Bench:
             f'{{"python_version": "{_PYTHON_VERSION}", '
             f'"platform": "{_PLATFORM_SYSTEM}", '
             f'"timestamp": "{datetime.now(timezone.utc).isoformat()}", '
-            f'"pybench_version": "{_PYBENCH_VERSION}"}}'
+            f'"blackbox_bench_version": "{_BLACKBOX_BENCH_VERSION}"}}'
         )
         return _format_results_json(self._results, metadata)
 

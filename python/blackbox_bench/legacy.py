@@ -1,17 +1,17 @@
-"""v0.1.0 compatibility shim. Removed in pybench v1.1."""
+"""v0.1.0 compatibility shim. Removed in blackbox_bench v1.1."""
 from __future__ import annotations
 
 import warnings as _w
 
 _w.warn(
-    "pybench.legacy is deprecated and will be removed in pybench 1.1. "
-    "Migrate to the new pybench v1.0 API (see MIGRATION.md).",
+    "blackbox_bench.legacy is deprecated and will be removed in blackbox_bench 1.1. "
+    "Migrate to the new blackbox_bench v1.0 API (see MIGRATION.md).",
     DeprecationWarning,
     stacklevel=2,
 )
 
-from pybench._bench import Bench as _Bench, benchmark
-from pybench._pybench import BenchmarkResult
+from blackbox_bench._bench import Bench as _Bench, benchmark
+from blackbox_bench._blackbox_bench import BenchmarkResult
 
 
 class Bench(_Bench):

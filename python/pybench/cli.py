@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -29,6 +31,21 @@ def _cmd_run(args: argparse.Namespace) -> int:
     if not benchmarks:
         print("No benchmarks found.", file=sys.stderr)
         return 1
+    if args.profile:
+        if not shutil.which("py-spy"):
+            print("py-spy not found on PATH. Install with: pip install py-spy", file=sys.stderr)
+            return 2
+        for name, _fn, _opts in benchmarks:
+            svg = Path(f"{name}.svg")
+            cmd = [
+                "py-spy", "record", "-o", str(svg), "--",
+                sys.executable, "-c",
+                f"import importlib.util,sys;"
+                f"spec=importlib.util.spec_from_file_location('m','{args.path}');"
+                f"m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);"
+                f"m.{name}()",
+            ]
+            subprocess.run(cmd, check=False)
     bench = Bench(
         warmup=args.warmup,
         target_time_ns=args.target_time_ns,
@@ -86,6 +103,8 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--xml-style", choices=["junit", "raw"], default="junit")
     r.add_argument("--output", default=None)
     r.add_argument("--save", default=None, help="Write JSON results to file (in addition to --output)")
+    r.add_argument("--profile", action="store_true",
+                   help="Wrap each benchmark in py-spy and emit SVG flamegraphs")
 
     c = sub.add_parser("compare")
     c.add_argument("baseline")

@@ -73,6 +73,48 @@ def test_cli_run_xml_junit_default(tmp_path):
     assert "<testsuite" in out.stdout
 
 
+def test_cli_profile_flag_emits_svg_when_pyspy_available(tmp_path):
+    import shutil
+    if not shutil.which("py-spy"):
+        import pytest
+
+        pytest.skip("py-spy not installed")
+    _write_bench(tmp_path)
+    out = _run(
+        [
+            "run", "bench_sample.py",
+            "--warmup", "0", "--iterations", "2",
+            "--profile",
+            "--output", str(tmp_path / "out.json"),
+            "--format", "json",
+        ],
+        tmp_path,
+    )
+    assert out.returncode == 0, out.stderr
+    svgs = list(tmp_path.glob("*.svg"))
+    assert any("f" in p.name for p in svgs)
+
+
+def test_cli_profile_flag_errors_if_pyspy_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", "")
+    _write_bench(tmp_path)
+    # Override PATH on the subprocess too
+    env = {"PATH": ""}
+    out = subprocess.run(
+        [sys.executable, "-m", "pybench.cli",
+         "run", "bench_sample.py",
+         "--warmup", "0", "--iterations", "2",
+         "--profile"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={**env, "PYTHONPATH": ""},
+    )
+    assert out.returncode != 0
+    assert "py-spy" in out.stderr.lower()
+
+
 def test_cli_run_xml_raw_style(tmp_path):
     _write_bench(tmp_path)
     out = _run(

@@ -1,6 +1,8 @@
 use std::time::Instant;
 
+use pyo3::ffi;
 use pyo3::prelude::*;
+use pyo3::types::PyTuple;
 
 use crate::histogram::HdrHistogram;
 use crate::stats::{self, OutlierMethod};
@@ -264,17 +266,25 @@ impl Runner {
         let batch_size = self.calibrate_batched(py, &setup, &routine)?;
         for _ in 0..self.warmup {
             let state = setup.call0(py)?;
-            for _ in 0..batch_size {
-                routine.call1(py, (state.clone_ref(py),))?;
-            }
+            call_routine_batch(py, &routine, state, batch_size)?;
         }
         let iters = self.iterations.unwrap_or_else(|| self.estimate_iters(batch_size));
         let mut times = Vec::with_capacity(iters);
         for _ in 0..iters {
             let state = setup.call0(py)?;
+            let args = PyTuple::new_bound(py, [state]);
+            let routine_ptr = routine.as_ptr();
+            let args_ptr = args.as_ptr();
             let start = Instant::now();
             for _ in 0..batch_size {
-                routine.call1(py, (state.clone_ref(py),))?;
+                // SAFETY: routine_ptr and args_ptr remain valid through this scope
+                // (the `routine` PyObject and `args` Bound own their references). A
+                // returned PyObject must be DECREFed; null indicates a Python exception.
+                let result = unsafe { ffi::PyObject_CallObject(routine_ptr, args_ptr) };
+                if result.is_null() {
+                    return Err(PyErr::fetch(py));
+                }
+                unsafe { ffi::Py_DECREF(result) };
             }
             let elapsed = start.elapsed().as_nanos();
             let per_call = (elapsed / batch_size as u128) as i64;
@@ -326,12 +336,11 @@ impl Runner {
         routine: &PyObject,
     ) -> PyResult<usize> {
         let state = setup.call0(py)?;
+        let args = PyTuple::new_bound(py, [state]);
         let mut batch: usize = 1;
         loop {
             let start = Instant::now();
-            for _ in 0..batch {
-                routine.call1(py, (state.clone_ref(py),))?;
-            }
+            call_routine_batch_ptr(py, routine.as_ptr(), args.as_ptr(), batch)?;
             let elapsed = start.elapsed().as_nanos();
             if elapsed >= MIN_BATCH_TIME_NS {
                 return Ok(batch);
@@ -339,6 +348,35 @@ impl Runner {
             batch *= 2;
         }
     }
+}
+
+/// Invoke `routine(state)` `batch_size` times. Used by warmup and calibration —
+/// not the timed measurement path (which inlines the loop to keep `Instant::now()`
+/// adjacent to the calls).
+fn call_routine_batch(
+    py: Python<'_>,
+    routine: &PyObject,
+    state: PyObject,
+    batch_size: usize,
+) -> PyResult<()> {
+    let args = PyTuple::new_bound(py, [state]);
+    call_routine_batch_ptr(py, routine.as_ptr(), args.as_ptr(), batch_size)
+}
+
+fn call_routine_batch_ptr(
+    py: Python<'_>,
+    routine_ptr: *mut ffi::PyObject,
+    args_ptr: *mut ffi::PyObject,
+    batch_size: usize,
+) -> PyResult<()> {
+    for _ in 0..batch_size {
+        let result = unsafe { ffi::PyObject_CallObject(routine_ptr, args_ptr) };
+        if result.is_null() {
+            return Err(PyErr::fetch(py));
+        }
+        unsafe { ffi::Py_DECREF(result) };
+    }
+    Ok(())
 }
 
 #[pyfunction]

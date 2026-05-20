@@ -19,7 +19,7 @@ default = []
 extension-module = ["pyo3/extension-module"]
 
 [dependencies]
-pyo3 = { version = "0.22", features = ["abi3-py310"] }
+pyo3 = { version = "0.24", features = ["abi3-py310"] }
 hdrhistogram = "7"
 fastrand = "2"
 

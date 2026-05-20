@@ -19,13 +19,14 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install maturin & dev deps
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install maturin pytest coverage
-      - name: Build extension
-        run: maturin develop --release
+      - name: Install dev deps
+        run: python -m pip install --upgrade pip pytest coverage
+      - name: Build & install pybench
+        # `pip install -e .` uses maturin as the PEP 517 build backend (see
+        # pyproject.toml [build-system]); unlike `maturin develop`, this works
+        # without an active virtualenv, which setup-python doesn't provide.
+        run: python -m pip install -e .
       - name: Cargo unit tests
         run: cargo test --lib
       - name: Pytest
-        run: pytest -v
+        run: python -m pytest -v

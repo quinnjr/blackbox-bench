@@ -116,6 +116,19 @@ def _cmd_compare(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # The table and HTML reporters emit `─` (box drawing) and `µ` (micro
+    # sign). On Windows the default console codec is cp1252 which raises
+    # UnicodeEncodeError when print writes them. Reconfigure stdout/stderr
+    # to UTF-8 so the CLI works out of the box.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        except (AttributeError, OSError):
+            # Reconfigure isn't available on non-TextIOWrapper streams
+            # (e.g. when stdout is captured by pytest's capsys). The
+            # capturing wrapper handles unicode correctly, so this is fine.
+            pass
+
     p = argparse.ArgumentParser(prog="pybench")
     sub = p.add_subparsers(dest="command", required=True)
 

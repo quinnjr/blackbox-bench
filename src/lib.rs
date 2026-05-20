@@ -1,6 +1,7 @@
 use pyo3::prelude::*;
 
 mod black_box;
+mod stats;
 
 #[pymodule]
 fn _pybench(m: &Bound<'_, PyModule>) -> PyResult<()> {

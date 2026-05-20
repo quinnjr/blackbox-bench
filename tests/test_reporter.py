@@ -1,10 +1,10 @@
 import json
 
-import pybench
+import blackbox_bench
 
 
 def _bench_with_one_result():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark
     def x():
@@ -60,16 +60,16 @@ def test_to_xml_default_is_junit_compatible():
 
 
 def test_to_table_empty_results():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
     out = bench.to_table()
     assert "No benchmark results" in out
 
 
 def test_fmt_time_units_renders_milliseconds():
     """The table renders the right unit tier without needing a real sleep."""
-    from pybench._pybench import _synthesize
+    from blackbox_bench._blackbox_bench import _synthesize
 
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
     # 5 ms — well into the ms tier.
     bench._results.append(_synthesize("slow", 5_000_000))
 
@@ -79,7 +79,7 @@ def test_fmt_time_units_renders_milliseconds():
 
 
 def test_json_str_escapes_in_name():
-    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+    bench = blackbox_bench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
 
     @bench.benchmark(name='quoted"\\back\nnewline\ttab\x01ctrl')
     def f():
@@ -90,7 +90,7 @@ def test_json_str_escapes_in_name():
 
 
 def test_html_escape_special_chars_in_name():
-    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+    bench = blackbox_bench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
 
     @bench.benchmark(name='<script>&"\'')
     def f():
@@ -107,7 +107,7 @@ def test_xml_cdata_safe_against_terminator_in_payload():
     """A benchmark name containing ']]>' must not terminate the CDATA section."""
     import xml.etree.ElementTree as ET
 
-    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+    bench = blackbox_bench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
 
     @bench.benchmark(name="foo]]>bar")
     def f():
@@ -122,7 +122,7 @@ def test_xml_cdata_safe_against_terminator_in_payload():
 
 
 def test_xml_escape_special_chars_in_name():
-    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+    bench = blackbox_bench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
 
     @bench.benchmark(name='<x>&"\'')
     def f():
@@ -138,7 +138,7 @@ def test_xml_escape_special_chars_in_name():
 def test_json_includes_throughput_when_set():
     # overhead_subtract=False so the tiny benchmark isn't zeroed out (which
     # would yield ops_per_sec=Infinity and a null throughput in JSON).
-    bench = pybench.Bench(
+    bench = blackbox_bench.Bench(
         warmup=0, iterations=3, target_time_ns=10_000_000, overhead_subtract=False,
     )
 
@@ -157,7 +157,7 @@ def test_to_xml_raw_mirrors_json_structure():
     bench = _bench_with_one_result()
     xml = bench.to_xml(style="raw")
     tree = ET.fromstring(xml)
-    assert tree.tag == "pybench"
+    assert tree.tag == "blackbox-bench"
     results = tree.find("results")
     assert results is not None
     rows = results.findall("result")

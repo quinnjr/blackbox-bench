@@ -1,7 +1,7 @@
-"""pybench — lightweight Python microbenchmarking library."""
-from pybench import _bench as _bench
-from pybench._bench import Bench, benchmark
-from pybench._pybench import (
+"""blackbox_bench — lightweight Python microbenchmarking library."""
+from blackbox_bench import _bench as _bench
+from blackbox_bench._bench import Bench, benchmark
+from blackbox_bench._blackbox_bench import (
     BenchmarkResult,
     ComparisonReport,
     DiffRow,

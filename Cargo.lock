@@ -51,6 +51,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
 
 [[package]]
+name = "blackbox-bench"
+version = "1.0.0"
+dependencies = [
+ "criterion",
+ "fastrand",
+ "hdrhistogram",
+ "pyo3",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -446,16 +456,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "pybench"
-version = "1.0.0"
-dependencies = [
- "criterion",
- "fastrand",
- "hdrhistogram",
- "pyo3",
 ]
 
 [[package]]

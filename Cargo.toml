@@ -1,12 +1,12 @@
 [package]
-name = "pybench"
+name = "blackbox-bench"
 version = "1.0.0"
 edition = "2021"
 license = "MIT"
 description = "Lightweight Python microbenchmarking library — Rust core"
 
 [lib]
-name = "_pybench"
+name = "_blackbox_bench"
 # rlib lets the integration tests / criterion benches link against the crate's
 # public modules; cdylib is what maturin packages into the Python wheel.
 crate-type = ["cdylib", "rlib"]

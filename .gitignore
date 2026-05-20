@@ -12,3 +12,4 @@ target/
 htmlcov/
 .claude/
 
+publish.sh

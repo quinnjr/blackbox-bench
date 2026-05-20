@@ -1,6 +1,6 @@
 import json
 
-import pybench
+import blackbox_bench
 
 
 def _result(name, mean, lo, hi):
@@ -30,28 +30,28 @@ def _payload(rs):
 def test_compare_classifies_overlapping_cis_as_unchanged():
     baseline = _payload([_result("a", 100, 95, 105)])
     current = _payload([_result("a", 103, 98, 108)])
-    report = pybench.compare(baseline, current)
+    report = blackbox_bench.compare(baseline, current)
     assert report.rows[0].classification == "unchanged"
 
 
 def test_compare_classifies_disjoint_higher_as_regressed():
     baseline = _payload([_result("a", 100, 95, 105)])
     current = _payload([_result("a", 150, 145, 155)])
-    report = pybench.compare(baseline, current)
+    report = blackbox_bench.compare(baseline, current)
     assert report.rows[0].classification == "regressed"
 
 
 def test_compare_classifies_disjoint_lower_as_improved():
     baseline = _payload([_result("a", 200, 195, 205)])
     current = _payload([_result("a", 100, 95, 105)])
-    report = pybench.compare(baseline, current)
+    report = blackbox_bench.compare(baseline, current)
     assert report.rows[0].classification == "improved"
 
 
 def test_compare_marks_new_and_removed():
     baseline = _payload([_result("a", 100, 95, 105)])
     current = _payload([_result("b", 100, 95, 105)])
-    report = pybench.compare(baseline, current)
+    report = blackbox_bench.compare(baseline, current)
     classes = {row.name: row.classification for row in report.rows}
     assert classes == {"a": "removed", "b": "new"}
 
@@ -67,7 +67,7 @@ def _make_report():
         _result("b", 300, 290, 310),    # regressed
         _result("d", 10, 8, 12),        # new
     ])
-    return pybench.compare(baseline, current)
+    return blackbox_bench.compare(baseline, current)
 
 
 def test_comparison_report_format_table():
@@ -128,14 +128,14 @@ def test_compare_no_results_key_raises():
     import pytest
 
     with pytest.raises(ValueError):
-        pybench.compare("{}", json.dumps({"metadata": {}, "results": []}))
+        blackbox_bench.compare("{}", json.dumps({"metadata": {}, "results": []}))
 
 
 def test_compare_results_not_array_raises():
     import pytest
 
     with pytest.raises(ValueError):
-        pybench.compare(
+        blackbox_bench.compare(
             json.dumps({"results": "not-an-array"}),
             json.dumps({"results": []}),
         )
@@ -145,7 +145,7 @@ def test_compare_payload_not_object_raises():
     import pytest
 
     with pytest.raises(ValueError):
-        pybench.compare("[]", json.dumps({"results": []}))
+        blackbox_bench.compare("[]", json.dumps({"results": []}))
 
 
 def test_compare_rejects_oversized_input():
@@ -153,9 +153,9 @@ def test_compare_rejects_oversized_input():
 
     huge = "a" * (51 * 1024 * 1024)  # 51 MB, just over the 50 MB cap
     with pytest.raises(ValueError, match="exceeds.*limit"):
-        pybench.compare(huge, json.dumps({"results": []}))
+        blackbox_bench.compare(huge, json.dumps({"results": []}))
     with pytest.raises(ValueError, match="current.*exceeds"):
-        pybench.compare(json.dumps({"results": []}), huge)
+        blackbox_bench.compare(json.dumps({"results": []}), huge)
 
 
 def test_compare_error_identifies_baseline_vs_current():
@@ -163,18 +163,18 @@ def test_compare_error_identifies_baseline_vs_current():
 
     # Malformed baseline → error message mentions "baseline"
     with pytest.raises(ValueError, match="baseline"):
-        pybench.compare("not json at all", json.dumps({"results": []}))
+        blackbox_bench.compare("not json at all", json.dumps({"results": []}))
 
     # Malformed current → error message mentions "current"
     with pytest.raises(ValueError, match="current"):
-        pybench.compare(json.dumps({"results": []}), "not json at all")
+        blackbox_bench.compare(json.dumps({"results": []}), "not json at all")
 
 
 def test_compare_row_not_object_raises():
     import pytest
 
     with pytest.raises(ValueError):
-        pybench.compare(
+        blackbox_bench.compare(
             json.dumps({"results": ["not-an-object"]}),
             json.dumps({"results": []}),
         )
@@ -184,7 +184,7 @@ def test_compare_row_missing_name_raises():
     import pytest
 
     with pytest.raises(ValueError, match="name"):
-        pybench.compare(
+        blackbox_bench.compare(
             json.dumps({"results": [{"mean_ns": 1.0, "ci95_low_ns": 0.5, "ci95_high_ns": 1.5}]}),
             json.dumps({"results": []}),
         )
@@ -194,7 +194,7 @@ def test_compare_row_missing_mean_raises():
     import pytest
 
     with pytest.raises(ValueError, match="mean_ns"):
-        pybench.compare(
+        blackbox_bench.compare(
             json.dumps({"results": [{"name": "x", "ci95_low_ns": 0.5, "ci95_high_ns": 1.5}]}),
             json.dumps({"results": []}),
         )
@@ -204,7 +204,7 @@ def test_compare_row_missing_ci_raises():
     import pytest
 
     with pytest.raises(ValueError, match="ci95"):
-        pybench.compare(
+        blackbox_bench.compare(
             json.dumps({"results": [{"name": "x", "mean_ns": 1.0, "ci95_low_ns": 0.5}]}),
             json.dumps({"results": []}),
         )
@@ -212,7 +212,7 @@ def test_compare_row_missing_ci_raises():
 
 def test_comparison_report_format_empty():
     empty = _payload([])
-    report = pybench.compare(empty, empty)
+    report = blackbox_bench.compare(empty, empty)
     assert "No benchmarks to compare" in report.format("table")
 
 

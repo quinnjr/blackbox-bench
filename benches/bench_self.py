@@ -1,10 +1,10 @@
-"""pybench benchmarking pybench.
+"""blackbox_bench benchmarking blackbox_bench.
 
 Run with:
-    pybench run benches/bench_self.py --warmup 5 --iterations 200
+    blackbox_bench run benches/bench_self.py --warmup 5 --iterations 200
 
-This file uses the public pybench API (the `@pybench.benchmark` decorator)
-to time pybench's own primitives. Useful as a sanity check that the
+This file uses the public blackbox_bench API (the `@blackbox_bench.benchmark` decorator)
+to time blackbox_bench's own primitives. Useful as a sanity check that the
 harness reports sane numbers for the operations it exposes to users, and
 as a tracker for perf regressions in CI alongside benches/bench_dogfood.py.
 """
@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import json
 
-import pybench
+import blackbox_bench
 # IterBatched is the underlying pyclass used by Bench.iter_batched(). At
 # module-level (without a Bench instance) we construct it directly so the
 # Runner sees the same setup/routine sentinel it does from the decorator.
-from pybench._pybench import IterBatched
+from blackbox_bench._blackbox_bench import IterBatched
 
 # ---------- Reusable inputs (built once at import) ----------
 
@@ -48,94 +48,94 @@ _RESULT_JSON = json.dumps(
     }
 )
 
-_HISTOGRAM_FILLED = pybench.HdrHistogram()
+_HISTOGRAM_FILLED = blackbox_bench.HdrHistogram()
 for _v in _SAMPLES:
     _HISTOGRAM_FILLED.record(_v + 1)
 
 
 # ---------- black_box ----------
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def black_box_int():
-    pybench.black_box(42)
+    blackbox_bench.black_box(42)
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def black_box_list():
-    pybench.black_box(_SAMPLES)
+    blackbox_bench.black_box(_SAMPLES)
 
 
 # ---------- HdrHistogram ----------
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def histogram_new():
-    pybench.HdrHistogram()
+    blackbox_bench.HdrHistogram()
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def histogram_record():
     # setup builds a fresh HdrHistogram per sample (untimed); routine times
     # the single record() call.
     return IterBatched(
-        setup=pybench.HdrHistogram,
+        setup=blackbox_bench.HdrHistogram,
         routine=lambda h: h.record(1_234),
     )
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def histogram_percentile_p50():
     _HISTOGRAM_FILLED.percentile(50.0)
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def histogram_percentile_p99():
     _HISTOGRAM_FILLED.percentile(99.0)
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def histogram_to_dict():
     _HISTOGRAM_FILLED.to_dict()
 
 
 # ---------- compare ----------
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def compare_identical_10():
     """Self-compare: every row classifies as `unchanged`."""
-    pybench.compare(_RESULT_JSON, _RESULT_JSON)
+    blackbox_bench.compare(_RESULT_JSON, _RESULT_JSON)
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def comparison_report_format_table():
-    report = pybench.compare(_RESULT_JSON, _RESULT_JSON)
+    report = blackbox_bench.compare(_RESULT_JSON, _RESULT_JSON)
     report.format("table")
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def comparison_report_format_json():
-    report = pybench.compare(_RESULT_JSON, _RESULT_JSON)
+    report = blackbox_bench.compare(_RESULT_JSON, _RESULT_JSON)
     report.format("json")
 
 
 # ---------- Bench.measure context manager (synthesises a 1-sample result) ----------
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def measure_context_manager():
     # A throwaway Bench just for the context manager path; we don't .run() it
     # because that would nest measurement loops.
-    b = pybench.Bench(warmup=0, target_time_ns=1, overhead_subtract=False)
+    b = blackbox_bench.Bench(warmup=0, target_time_ns=1, overhead_subtract=False)
     with b.measure("inner"):
         pass
 
 
 # ---------- Public reporter throughput (uses a fully-built Bench) ----------
 
-from pybench._pybench import _synthesize
+from blackbox_bench._blackbox_bench import _synthesize
 
 
 def _populated_bench():
     """Build a Bench with 5 synthesised single-sample results — no timing involved."""
-    b = pybench.Bench(warmup=0, target_time_ns=1, overhead_subtract=False)
+    b = blackbox_bench.Bench(warmup=0, target_time_ns=1, overhead_subtract=False)
     for i in range(5):
         b._results.append(_synthesize(f"row_{i}", 1_000 + i))
     return b
@@ -146,21 +146,21 @@ def _populated_bench():
 # would include the bench construction + 5 _synthesize calls (~250 µs of
 # noise) and dwarf the reporter call itself.
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def report_to_table():
     return IterBatched(setup=_populated_bench, routine=lambda b: b.to_table())
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def report_to_json():
     return IterBatched(setup=_populated_bench, routine=lambda b: b.to_json())
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def report_to_html():
     return IterBatched(setup=_populated_bench, routine=lambda b: b.to_html())
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def report_to_xml_junit():
     return IterBatched(setup=_populated_bench, routine=lambda b: b.to_xml())

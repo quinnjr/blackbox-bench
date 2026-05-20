@@ -2,9 +2,9 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What pybench is
+## What blackbox-bench is
 
-A Python microbenchmarking library with a Rust core via PyO3 + maturin. The Rust extension (`pybench._pybench`) provides the sampling loop and statistical primitives; the Python package at `python/pybench/` is a thin orchestrator that registers user-supplied callables, threads results through the Rust runner, and ships the CLI. Targets Python 3.10–3.13 via a single abi3 wheel.
+A Python microbenchmarking library with a Rust core via PyO3 + maturin. The Rust extension (`blackbox_bench._blackbox_bench`) provides the sampling loop and statistical primitives; the Python package at `python/blackbox_bench/` is a thin orchestrator that registers user-supplied callables, threads results through the Rust runner, and ships the CLI. Targets Python 3.10–3.13 via a single abi3 wheel.
 
 ## Build & dev commands
 
@@ -39,7 +39,7 @@ cargo test --lib
 cargo test --lib stats::tests::median_odd
 
 # Python coverage (expected: 100%)
-.venv/bin/coverage run --source=python/pybench -m pytest -q
+.venv/bin/coverage run --source=python/blackbox_bench -m pytest -q
 .venv/bin/coverage report
 
 # Combined Python + Rust line coverage via llvm-cov
@@ -56,17 +56,17 @@ cargo llvm-cov report --summary-only
 Two layers:
 
 - **`benches/rust_internals.rs`** — criterion benches for the Rust hot paths (stats, formatters). Run with `cargo bench --bench rust_internals`. Criterion stores baselines under `target/criterion/`, so successive runs report deltas automatically.
-- **`benches/bench_dogfood.py`** — Python-level end-to-end dogfood. Run with `.venv/bin/python -m pybench.cli run benches/bench_dogfood.py --warmup 1 --iterations 100`. Used to validate harness overhead-subtraction (`empty_pass` should report ~0–1 ns).
+- **`benches/bench_dogfood.py`** — Python-level end-to-end dogfood. Run with `.venv/bin/python -m blackbox_bench.cli run benches/bench_dogfood.py --warmup 1 --iterations 100`. Used to validate harness overhead-subtraction (`empty_pass` should report ~0–1 ns).
 
 After perf changes, run **both** layers; a Rust-only win that regresses the Python-call orchestration is invisible to criterion.
 
 ## CLI
 
 ```bash
-.venv/bin/python -m pybench.cli run [PATH] [--warmup N] [--iterations N]
+.venv/bin/python -m blackbox_bench.cli run [PATH] [--warmup N] [--iterations N]
     [--format {table,json,html,xml}] [--xml-style {junit,raw}]
     [--output FILE] [--save FILE] [--profile]
-.venv/bin/python -m pybench.cli compare BASELINE CURRENT [--format ...] [--output FILE]
+.venv/bin/python -m blackbox_bench.cli compare BASELINE CURRENT [--format ...] [--output FILE]
 ```
 
 `--profile` shells out to `py-spy` (must be on PATH) and writes per-benchmark SVG flamegraphs. `--json` is a deprecated v0.1.0 alias for `--format json`, removed in v1.1.
@@ -117,9 +117,9 @@ When touching dependencies or crate-type, verify all three modes still work (`ma
 - `histogram.rs` — wraps the `hdrhistogram` crate; samples above 60 s are saturated to the histogram max (never silently dropped).
 - `compare.rs` — JSON-comparison classifier. Uses Python's `json.loads` via `py.import("json")` (no serde dep). Classification is CI-overlap based; `c.ci_low > b.ci_high` is the strict-regression check — touching CIs are deliberately `unchanged`.
 - `report.rs` — table / JSON / HTML (with inline SVG sparklines) / JUnit-XML reporters. All `String`-building uses `write!(s, ...)` rather than `s.push_str(&format!(...))` to avoid transient allocations. The HTML's CDATA payload is run through `cdata_safe()` so `]]>` in a benchmark name can't terminate the section early.
-- `black_box.rs` — `pybench.black_box` opaque pass-through.
+- `black_box.rs` — `blackbox_bench.black_box` opaque pass-through.
 
-### Python (`python/pybench/`)
+### Python (`python/blackbox_bench/`)
 
 - `__init__.py` — re-exports the public API. **`Runner` is intentionally importable but not in `__all__`** because its constructor is implementation detail.
 - `_bench.py` — the `Bench` orchestrator and the module-level `@benchmark` decorator (which writes to a `_global_registry` list consumed by the CLI). `Bench.run()` assigns to `self._results` after each benchmark so partial results survive an exception from a later one.

@@ -1,5 +1,7 @@
 //! Reporters: table / JSON / HTML / XML. Comparison and result variants.
 
+use std::fmt::Write;
+
 use pyo3::prelude::*;
 
 use crate::compare::DiffRowView;
@@ -470,21 +472,26 @@ pub fn format_json_refs(results: &[&BenchmarkResult], metadata: &str) -> String 
     s.push_str(",\n  \"results\": [\n");
     for (i, r) in results.iter().enumerate() {
         s.push_str("    {");
-        s.push_str(&format!("\"name\":{},", json_str(&r.name)));
-        s.push_str(&format!("\"iterations\":{},", r.iterations));
-        s.push_str(&format!("\"batch_size\":{},", r.batch_size));
-        s.push_str(&format!("\"mean_ns\":{},", json_num(r.mean_ns)));
-        s.push_str(&format!("\"clean_mean_ns\":{},", json_num(r.clean_mean_ns)));
-        s.push_str(&format!("\"median_ns\":{},", json_num(r.median_ns)));
-        s.push_str(&format!("\"stddev_ns\":{},", json_num(r.stddev_ns)));
-        s.push_str(&format!("\"min_ns\":{},", r.min_ns));
-        s.push_str(&format!("\"max_ns\":{},", r.max_ns));
-        s.push_str(&format!("\"ops_per_sec\":{},", json_num(r.ops_per_sec)));
-        s.push_str(&format!("\"outliers\":{},", r.outliers));
-        s.push_str(&format!("\"ci95_low_ns\":{},", json_num(r.ci95_low_ns)));
-        s.push_str(&format!("\"ci95_high_ns\":{},", json_num(r.ci95_high_ns)));
+        // write! into the pre-allocated String to skip the intermediate
+        // String each format!() allocation would produce — ~14 allocs per
+        // result avoided.
+        let _ = write!(s, "\"name\":{},", json_str(&r.name));
+        let _ = write!(s, "\"iterations\":{},", r.iterations);
+        let _ = write!(s, "\"batch_size\":{},", r.batch_size);
+        let _ = write!(s, "\"mean_ns\":{},", json_num(r.mean_ns));
+        let _ = write!(s, "\"clean_mean_ns\":{},", json_num(r.clean_mean_ns));
+        let _ = write!(s, "\"median_ns\":{},", json_num(r.median_ns));
+        let _ = write!(s, "\"stddev_ns\":{},", json_num(r.stddev_ns));
+        let _ = write!(s, "\"min_ns\":{},", r.min_ns);
+        let _ = write!(s, "\"max_ns\":{},", r.max_ns);
+        let _ = write!(s, "\"ops_per_sec\":{},", json_num(r.ops_per_sec));
+        let _ = write!(s, "\"outliers\":{},", r.outliers);
+        let _ = write!(s, "\"ci95_low_ns\":{},", json_num(r.ci95_low_ns));
+        let _ = write!(s, "\"ci95_high_ns\":{},", json_num(r.ci95_high_ns));
         match r.throughput_per_sec {
-            Some(t) => s.push_str(&format!("\"throughput_per_sec\":{},", json_num(t))),
+            Some(t) => {
+                let _ = write!(s, "\"throughput_per_sec\":{},", json_num(t));
+            }
             None => s.push_str("\"throughput_per_sec\":null,"),
         }
         s.push_str("\"param\":null}");

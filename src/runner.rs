@@ -161,6 +161,7 @@ pub struct Runner {
     iterations: Option<usize>,
     confidence_level: f64,
     outlier_method: OutlierMethod,
+    #[pyo3(get)]
     overhead_ns: f64,
     histogram: bool,
     rng: fastrand::Rng,
@@ -183,6 +184,7 @@ impl Runner {
         overhead_subtract=true,
         seed=None,
         histogram=false,
+        overhead_ns=None,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -195,6 +197,7 @@ impl Runner {
         overhead_subtract: bool,
         seed: Option<u64>,
         histogram: bool,
+        overhead_ns: Option<f64>,
     ) -> PyResult<Self> {
         let outlier_method = match outlier_method {
             "tukey" => OutlierMethod::Tukey,
@@ -210,10 +213,10 @@ impl Runner {
             Some(s) => fastrand::Rng::with_seed(s),
             None => fastrand::Rng::new(),
         };
-        let overhead_ns = if overhead_subtract {
-            measure_overhead(py)?
-        } else {
-            0.0
+        let overhead_ns = match overhead_ns {
+            Some(v) => v,
+            None if overhead_subtract => measure_overhead(py)?,
+            None => 0.0,
         };
         Ok(Self {
             warmup,

@@ -86,8 +86,11 @@ class Bench:
 
     def run(self) -> list[BenchmarkResult]:
         results = list(self._results)
+        cached_overhead_ns: float | None = None
         for name, fn, opts in self._registered:
-            runner = self._make_runner(opts)
+            runner = self._make_runner(opts, cached_overhead_ns)
+            if cached_overhead_ns is None:
+                cached_overhead_ns = runner.overhead_ns
             throughput = opts.get("throughput")
             if "params" in opts:
                 for p in opts["params"]:
@@ -154,7 +157,11 @@ class Bench:
         else:
             print(text)
 
-    def _make_runner(self, opts: dict[str, Any] | None = None) -> Runner:
+    def _make_runner(
+        self,
+        opts: dict[str, Any] | None = None,
+        cached_overhead_ns: float | None = None,
+    ) -> Runner:
         opts = opts or {}
         return Runner(
             warmup=opts.get("warmup", self._warmup),
@@ -165,6 +172,7 @@ class Bench:
             overhead_subtract=self._overhead_subtract,
             seed=self._seed,
             histogram=self._histogram,
+            overhead_ns=cached_overhead_ns,
         )
 
 

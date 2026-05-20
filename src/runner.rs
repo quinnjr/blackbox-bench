@@ -2,6 +2,7 @@ use std::time::Instant;
 
 use pyo3::prelude::*;
 
+use crate::histogram::HdrHistogram;
 use crate::stats::{self, OutlierMethod};
 
 const MIN_BATCH_TIME_NS: u128 = 5_000; // 5µs per batch minimum
@@ -42,6 +43,8 @@ pub struct BenchmarkResult {
     pub throughput_per_sec: Option<f64>,
     #[pyo3(get)]
     pub param: Option<PyObject>,
+    #[pyo3(get)]
+    pub histogram: Option<Py<HdrHistogram>>,
 }
 
 #[pymethods]
@@ -84,6 +87,7 @@ impl BenchmarkResult {
         outlier_method: OutlierMethod,
         throughput: Option<f64>,
         param: Option<PyObject>,
+        histogram: Option<Py<HdrHistogram>>,
         rng: &mut fastrand::Rng,
     ) -> Self {
         let iterations = times_ns.len();
@@ -105,6 +109,7 @@ impl BenchmarkResult {
                 ci95_high_ns: 0.0,
                 throughput_per_sec: throughput,
                 param,
+                histogram,
             };
         }
         let mean_ns = stats::mean(&times_ns);
@@ -138,6 +143,7 @@ impl BenchmarkResult {
             ci95_high_ns,
             throughput_per_sec,
             param,
+            histogram,
         }
     }
 }
@@ -166,6 +172,7 @@ pub struct Runner {
     confidence_level: f64,
     outlier_method: OutlierMethod,
     overhead_ns: f64,
+    histogram: bool,
     rng: fastrand::Rng,
 }
 
@@ -180,7 +187,9 @@ impl Runner {
         outlier_method="tukey",
         overhead_subtract=true,
         seed=None,
+        histogram=false,
     ))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         py: Python<'_>,
         warmup: usize,
@@ -190,6 +199,7 @@ impl Runner {
         outlier_method: &str,
         overhead_subtract: bool,
         seed: Option<u64>,
+        histogram: bool,
     ) -> PyResult<Self> {
         let outlier_method = match outlier_method {
             "tukey" => OutlierMethod::Tukey,
@@ -217,6 +227,7 @@ impl Runner {
             confidence_level,
             outlier_method,
             overhead_ns,
+            histogram,
             rng,
         })
     }
@@ -242,6 +253,11 @@ impl Runner {
             let adjusted = (per_call as f64 - self.overhead_ns).max(0.0) as i64;
             times.push(adjusted);
         }
+        let histogram = if self.histogram {
+            Some(Py::new(py, HdrHistogram::from_samples(&times))?)
+        } else {
+            None
+        };
         Ok(BenchmarkResult::from_times(
             name,
             times,
@@ -250,6 +266,7 @@ impl Runner {
             self.outlier_method,
             throughput,
             param,
+            histogram,
             &mut self.rng,
         ))
     }
@@ -284,6 +301,11 @@ impl Runner {
             let adjusted = (per_call as f64 - self.overhead_ns).max(0.0) as i64;
             times.push(adjusted);
         }
+        let histogram = if self.histogram {
+            Some(Py::new(py, HdrHistogram::from_samples(&times))?)
+        } else {
+            None
+        };
         Ok(BenchmarkResult::from_times(
             name,
             times,
@@ -292,6 +314,7 @@ impl Runner {
             self.outlier_method,
             throughput,
             param,
+            histogram,
             &mut self.rng,
         ))
     }
@@ -350,6 +373,7 @@ pub fn _synthesize(name: String, elapsed_ns: i64) -> BenchmarkResult {
         1,
         0.95,
         OutlierMethod::None,
+        None,
         None,
         None,
         &mut rng,

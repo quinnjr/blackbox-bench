@@ -106,6 +106,7 @@ class Bench:
             outlier_method=self._outlier_method,
             overhead_subtract=self._overhead_subtract,
             seed=self._seed,
+            histogram=self._histogram,
         )
 
 

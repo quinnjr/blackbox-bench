@@ -42,3 +42,25 @@ def test_module_level_benchmark_decorator():
         pass
 
     assert any(name == "h" for name, _, _ in pybench._bench._global_registry)
+
+
+def test_iter_batched_setup_runs_per_sample_not_per_call():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    setup_calls = [0]
+    routine_calls = [0]
+
+    @bench.benchmark
+    def sort_random():
+        def setup():
+            setup_calls[0] += 1
+            return [3, 1, 2]
+
+        def routine(xs):
+            routine_calls[0] += 1
+            sorted(xs)
+
+        return bench.iter_batched(setup=setup, routine=routine)
+
+    results = bench.run()
+    assert results[0].name == "sort_random"
+    assert setup_calls[0] < routine_calls[0], "setup should run once per sample, not per call"

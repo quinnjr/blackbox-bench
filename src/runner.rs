@@ -143,6 +143,22 @@ impl BenchmarkResult {
 }
 
 #[pyclass]
+pub struct IterBatched {
+    #[pyo3(get)]
+    pub setup: PyObject,
+    #[pyo3(get)]
+    pub routine: PyObject,
+}
+
+#[pymethods]
+impl IterBatched {
+    #[new]
+    fn new(setup: PyObject, routine: PyObject) -> Self {
+        Self { setup, routine }
+    }
+}
+
+#[pyclass]
 pub struct Runner {
     warmup: usize,
     target_time_ns: u128,
@@ -234,6 +250,45 @@ impl Runner {
             &mut self.rng,
         ))
     }
+
+    fn run_iter_batched(
+        &mut self,
+        py: Python<'_>,
+        name: String,
+        setup: PyObject,
+        routine: PyObject,
+    ) -> PyResult<BenchmarkResult> {
+        let batch_size = self.calibrate_batched(py, &setup, &routine)?;
+        for _ in 0..self.warmup {
+            let state = setup.call0(py)?;
+            for _ in 0..batch_size {
+                routine.call1(py, (state.clone_ref(py),))?;
+            }
+        }
+        let iters = self.iterations.unwrap_or_else(|| self.estimate_iters(batch_size));
+        let mut times = Vec::with_capacity(iters);
+        for _ in 0..iters {
+            let state = setup.call0(py)?;
+            let start = Instant::now();
+            for _ in 0..batch_size {
+                routine.call1(py, (state.clone_ref(py),))?;
+            }
+            let elapsed = start.elapsed().as_nanos();
+            let per_call = (elapsed / batch_size as u128) as i64;
+            let adjusted = (per_call as f64 - self.overhead_ns).max(0.0) as i64;
+            times.push(adjusted);
+        }
+        Ok(BenchmarkResult::from_times(
+            name,
+            times,
+            batch_size,
+            self.confidence_level,
+            self.outlier_method,
+            None,
+            None,
+            &mut self.rng,
+        ))
+    }
 }
 
 impl Runner {
@@ -253,6 +308,30 @@ impl Runner {
 
     fn estimate_iters(&self, _batch_size: usize) -> usize {
         100
+    }
+
+    fn calibrate_batched(
+        &self,
+        py: Python<'_>,
+        setup: &PyObject,
+        routine: &PyObject,
+    ) -> PyResult<usize> {
+        let state = setup.call0(py)?;
+        let mut batch: usize = 1;
+        loop {
+            let start = Instant::now();
+            for _ in 0..batch {
+                routine.call1(py, (state.clone_ref(py),))?;
+            }
+            let elapsed = start.elapsed().as_nanos();
+            if elapsed >= MIN_BATCH_TIME_NS {
+                return Ok(batch);
+            }
+            if batch > (usize::MAX / 2) {
+                return Ok(batch);
+            }
+            batch *= 2;
+        }
     }
 }
 

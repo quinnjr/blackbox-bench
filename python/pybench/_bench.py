@@ -4,7 +4,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Callable, Iterator
 
-from pybench._pybench import BenchmarkResult, Runner, _synthesize
+from pybench._pybench import BenchmarkResult, IterBatched, Runner, _synthesize
 
 _global_registry: list[tuple[str, Callable[..., Any], dict[str, Any]]] = []
 
@@ -73,11 +73,18 @@ class Bench:
         elapsed = time.perf_counter_ns() - start
         self._results.append(_synthesize(name, elapsed))
 
+    def iter_batched(self, setup: Callable[[], Any], routine: Callable[[Any], Any]) -> IterBatched:
+        return IterBatched(setup, routine)
+
     def run(self) -> list[BenchmarkResult]:
         results = list(self._results)
         for name, fn, opts in self._registered:
             runner = self._make_runner(opts)
-            results.append(runner.run(name, fn))
+            probe = fn()
+            if isinstance(probe, IterBatched):
+                results.append(runner.run_iter_batched(name, probe.setup, probe.routine))
+            else:
+                results.append(runner.run(name, fn))
         self._results = results
         return results
 

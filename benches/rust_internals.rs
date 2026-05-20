@@ -1,4 +1,4 @@
-//! Criterion benchmarks for pybench's internal Rust functions.
+//! Criterion benchmarks for blackbox_bench's internal Rust functions.
 //!
 //! Run with: `cargo bench --bench rust_internals`
 //!
@@ -12,10 +12,10 @@ use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use fastrand::Rng;
 
-use _pybench::histogram::HdrHistogram;
-use _pybench::report;
-use _pybench::runner::BenchmarkResult;
-use _pybench::stats::{self, OutlierMethod};
+use _blackbox_bench::histogram::HdrHistogram;
+use _blackbox_bench::report;
+use _blackbox_bench::runner::BenchmarkResult;
+use _blackbox_bench::stats::{self, OutlierMethod};
 
 // ---------- Helpers ----------
 

@@ -7,8 +7,8 @@ from pathlib import Path
 def _write_bench(tmp_path: Path) -> Path:
     p = tmp_path / "bench_sample.py"
     p.write_text(
-        "import pybench\n"
-        "@pybench.benchmark\n"
+        "import blackbox_bench\n"
+        "@blackbox_bench.benchmark\n"
         "def f():\n"
         "    sum(range(10))\n"
     )
@@ -17,7 +17,7 @@ def _write_bench(tmp_path: Path) -> Path:
 
 def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "-m", "pybench.cli", *args],
+        [sys.executable, "-m", "blackbox_bench.cli", *args],
         cwd=cwd,
         capture_output=True,
         text=True,
@@ -109,7 +109,7 @@ def test_cli_profile_flag_errors_if_pyspy_missing(tmp_path, monkeypatch):
     _write_bench(tmp_path)
     env = {"PATH": ""}
     out = subprocess.run(
-        [sys.executable, "-m", "pybench.cli",
+        [sys.executable, "-m", "blackbox_bench.cli",
          "run", "bench_sample.py",
          "--warmup", "0", "--iterations", "2",
          "--profile"],
@@ -134,4 +134,4 @@ def test_cli_run_xml_raw_style(tmp_path):
         tmp_path,
     )
     assert out.returncode == 0
-    assert "<pybench>" in out.stdout
+    assert "<blackbox-bench>" in out.stdout

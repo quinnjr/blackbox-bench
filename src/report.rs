@@ -148,7 +148,7 @@ fn sparkline_svg(samples: &[i64]) -> String {
 pub fn format_html_refs(results: &[&BenchmarkResult], metadata: &str) -> String {
     let mut s = String::with_capacity(4096);
     s.push_str("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
-    s.push_str("<title>pybench results</title>");
+    s.push_str("<title>blackbox-bench results</title>");
     s.push_str("<style>\n");
     s.push_str("body{font-family:system-ui,-apple-system,sans-serif;margin:2rem;color:#222;}\n");
     s.push_str("table{border-collapse:collapse;width:100%;font-size:0.9rem;}\n");
@@ -161,7 +161,7 @@ pub fn format_html_refs(results: &[&BenchmarkResult], metadata: &str) -> String 
     s.push_str(".improved{background:#efe;color:#070;}\n");
     s.push_str(".unchanged{background:#eef;color:#226;}\n");
     s.push_str("</style></head><body>\n");
-    s.push_str("<h1>pybench results</h1>\n");
+    s.push_str("<h1>blackbox-bench results</h1>\n");
     let _ = write!(s, "<pre>{}</pre>\n", html_escape(metadata));
     s.push_str("<table><thead><tr>");
     for h in [
@@ -235,7 +235,7 @@ fn format_xml_junit(results: &[&BenchmarkResult]) -> String {
     s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     let _ = write!(
         s,
-        "<testsuite name=\"pybench\" tests=\"{}\" failures=\"0\">\n",
+        "<testsuite name=\"blackbox-bench\" tests=\"{}\" failures=\"0\">\n",
         results.len(),
     );
     for r in results {
@@ -256,7 +256,7 @@ fn format_xml_junit(results: &[&BenchmarkResult]) -> String {
 
 fn format_xml_raw(results: &[&BenchmarkResult]) -> String {
     let mut s = String::with_capacity(1024);
-    s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<pybench>\n  <results>\n");
+    s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<blackbox-bench>\n  <results>\n");
     for r in results {
         let _ = write!(
             s,
@@ -271,7 +271,7 @@ fn format_xml_raw(results: &[&BenchmarkResult]) -> String {
             r.outliers,
         );
     }
-    s.push_str("  </results>\n</pybench>\n");
+    s.push_str("  </results>\n</blackbox-bench>\n");
     s
 }
 
@@ -296,7 +296,7 @@ pub fn format_comparison_table(rows: &[DiffRowView]) -> String {
             d.classification.clone(),
         ]);
     }
-    layout_table("pybench comparison", &headers, &display_rows)
+    layout_table("blackbox-bench comparison", &headers, &display_rows)
 }
 
 pub fn format_comparison_json(rows: &[DiffRowView]) -> String {
@@ -334,14 +334,14 @@ pub fn format_comparison_json(rows: &[DiffRowView]) -> String {
 
 pub fn format_comparison_html(rows: &[DiffRowView]) -> String {
     let mut s = String::with_capacity(2048);
-    s.push_str("<!doctype html><html><head><meta charset=\"utf-8\"><title>pybench comparison</title>");
+    s.push_str("<!doctype html><html><head><meta charset=\"utf-8\"><title>blackbox-bench comparison</title>");
     s.push_str("<style>");
     s.push_str("body{font-family:system-ui,sans-serif;margin:2rem;}");
     s.push_str("table{border-collapse:collapse;width:100%;}");
     s.push_str("th,td{padding:0.4rem 0.6rem;border-bottom:1px solid #ddd;text-align:right;}");
     s.push_str("th:first-child,td:first-child{text-align:left;}");
     s.push_str(".regressed{color:#900;font-weight:600;}.improved{color:#070;font-weight:600;}.unchanged{color:#446;}");
-    s.push_str("</style></head><body><h1>pybench comparison</h1><table><thead><tr>");
+    s.push_str("</style></head><body><h1>blackbox-bench comparison</h1><table><thead><tr>");
     for h in ["Name", "Baseline", "Current", "Change", "Status"] {
         let _ = write!(s, "<th>{}</th>", html_escape(h));
     }
@@ -389,7 +389,7 @@ pub fn format_comparison_xml(rows: &[DiffRowView]) -> String {
         .collect();
     let _ = write!(
         s,
-        "<testsuite name=\"pybench\" tests=\"{}\" failures=\"{}\">\n",
+        "<testsuite name=\"blackbox-bench\" tests=\"{}\" failures=\"{}\">\n",
         rows.len(),
         failures.len(),
     );
@@ -470,7 +470,7 @@ pub fn format_table_refs(results: &[&BenchmarkResult]) -> String {
             r.outliers.to_string(),
         ]);
     }
-    layout_table("pybench results", &headers, &rows)
+    layout_table("blackbox-bench results", &headers, &rows)
 }
 
 pub fn format_json_refs(results: &[&BenchmarkResult], metadata: &str) -> String {

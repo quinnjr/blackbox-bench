@@ -2,11 +2,11 @@
 import json
 from pathlib import Path
 
-import pybench
+import blackbox_bench
 
 
 def test_full_workflow_run_report_compare(tmp_path):
-    bench = pybench.Bench(warmup=1, target_time_ns=30_000_000)
+    bench = blackbox_bench.Bench(warmup=1, target_time_ns=30_000_000)
 
     @bench.benchmark
     def quick():
@@ -26,7 +26,7 @@ def test_full_workflow_run_report_compare(tmp_path):
     assert "results" in baseline_data
     assert len(baseline_data["results"]) == 2
 
-    bench2 = pybench.Bench(warmup=1, target_time_ns=30_000_000)
+    bench2 = blackbox_bench.Bench(warmup=1, target_time_ns=30_000_000)
 
     @bench2.benchmark
     def quick():
@@ -39,7 +39,7 @@ def test_full_workflow_run_report_compare(tmp_path):
     bench2.run()
     current_json = bench2.to_json()
 
-    report = pybench.compare(baseline_path.read_text(), current_json)
+    report = blackbox_bench.compare(baseline_path.read_text(), current_json)
     assert len(report.rows) == 2
     classes = {row.classification for row in report.rows}
     assert classes <= {"unchanged", "regressed", "improved"}
@@ -49,7 +49,7 @@ def test_full_workflow_run_report_compare(tmp_path):
 
 
 def test_full_workflow_html_xml_outputs(tmp_path):
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark
     def t():

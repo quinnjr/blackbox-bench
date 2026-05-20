@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- **Project renamed from `pybench` to `blackbox-bench`.** The PyPI distribution is now `blackbox-bench`; the Python module is `blackbox_bench`; the CLI is `blackbox-bench`; the Rust extension is `_blackbox_bench`. The XML reporter's root element changes from `<pybench>` (and `<testsuite name="pybench">`) to `<blackbox-bench>` (and `<testsuite name="blackbox-bench">`). No behaviour changes — only names.
+
+### Migration
+- `pip uninstall pybench && pip install blackbox-bench`
+- `import pybench` → `import blackbox_bench`
+- `from pybench.legacy import …` → `from blackbox_bench.legacy import …`
+- `pybench …` CLI invocations → `blackbox-bench …`
+- CI consumers that parse `<pybench>` or `<testsuite name="pybench">` from the XML reporter need to update to `<blackbox-bench>`.
+
 ## [1.0.0] — 2026-05-20
 
 First stable release of the Rust-core rewrite. Folds in everything from the `1.0.0a1` pre-release plus the post-alpha hardening (dependency bumps, perf wins, security fixes, and review feedback). Drop-in for `1.0.0a1`; users who installed the alpha can upgrade with no code changes.

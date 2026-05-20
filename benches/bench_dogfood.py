@@ -1,22 +1,22 @@
-"""Dogfood: pybench measuring its own harness overhead.
+"""Dogfood: blackbox_bench measuring its own harness overhead.
 
-Run with: pybench run benches/bench_dogfood.py
+Run with: blackbox_bench run benches/bench_dogfood.py
 A correctly-functioning Runner with overhead_subtract=True should report
 the empty 'pass' benchmark at ~0ns +/- a few ns.
 """
-import pybench
+import blackbox_bench
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def empty_pass():
     pass
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def trivial_arithmetic():
     1 + 1
 
 
-@pybench.benchmark
+@blackbox_bench.benchmark
 def short_list_comp():
     [x * x for x in range(8)]

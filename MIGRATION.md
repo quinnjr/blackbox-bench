@@ -1,11 +1,11 @@
-# Migrating from pybench 0.1.0 to 1.0
+# Migrating from blackbox_bench 0.1.0 to 1.0
 
 ## Drop-in shim
 
 For one minor release (v1.0 only), the old API is available at:
 
 ```python
-from pybench.legacy import Bench, benchmark, BenchmarkResult
+from blackbox_bench.legacy import Bench, benchmark, BenchmarkResult
 ```
 
 Importing it emits a `DeprecationWarning`. The shim is removed in v1.1.
@@ -21,10 +21,10 @@ The v1.0 API is mostly a superset of v0.1.0. Most code only needs an import swap
 
 ```python
 # v0.1.0
-from pybench import Bench, benchmark
+from blackbox_bench import Bench, benchmark
 
 # v1.0 — same imports
-from pybench import Bench, benchmark
+from blackbox_bench import Bench, benchmark
 ```
 
 What changed:
@@ -45,7 +45,7 @@ for row in compare_results(baseline, current):
     print(row["name"], row["change_pct"])
 
 # v1.0 — DiffRow attribute access
-report = pybench.compare(baseline_json, current_json)
+report = blackbox_bench.compare(baseline_json, current_json)
 for row in report.rows:
     print(row.name, row.change_pct)
 ```

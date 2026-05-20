@@ -1,8 +1,8 @@
-import pybench
+import blackbox_bench
 
 
 def test_histogram_populated_when_enabled():
-    bench = pybench.Bench(warmup=0, target_time_ns=20_000_000, histogram=True)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=20_000_000, histogram=True)
 
     @bench.benchmark
     def f():
@@ -18,7 +18,7 @@ def test_histogram_populated_when_enabled():
 
 
 def test_histogram_absent_when_disabled():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000, histogram=False)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000, histogram=False)
 
     @bench.benchmark
     def g():
@@ -29,7 +29,7 @@ def test_histogram_absent_when_disabled():
 
 
 def test_hdrhistogram_direct_construction_and_methods():
-    h = pybench.HdrHistogram()
+    h = blackbox_bench.HdrHistogram()
     h.record(1)
     h.record(100)
     h.record(10_000)
@@ -42,7 +42,7 @@ def test_hdrhistogram_direct_construction_and_methods():
 
 
 def test_hdrhistogram_to_dict_has_percentiles():
-    h = pybench.HdrHistogram()
+    h = blackbox_bench.HdrHistogram()
     for v in [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]:
         h.record(v)
     d = h.to_dict()
@@ -54,7 +54,7 @@ def test_hdrhistogram_to_dict_has_percentiles():
 def test_hdrhistogram_record_rejects_out_of_range():
     import pytest
 
-    h = pybench.HdrHistogram()
+    h = blackbox_bench.HdrHistogram()
     # 60_000_000_000 is the upper bound; values above it should error
     with pytest.raises(ValueError):
         h.record(10**15)

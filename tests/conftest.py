@@ -1,17 +1,17 @@
-"""Shared pytest fixtures for the pybench test suite."""
+"""Shared pytest fixtures for the blackbox_bench test suite."""
 import pytest
 
-import pybench
+import blackbox_bench
 
 
 @pytest.fixture(autouse=True)
 def _restore_global_registry():
-    """Snapshot pybench._bench._global_registry around each test so a test that
+    """Snapshot blackbox_bench._bench._global_registry around each test so a test that
     appends (or clears) it cannot leak entries — or absences — to a later test
     under pytest-randomly or arbitrary ordering."""
-    snapshot = list(pybench._bench._global_registry)
+    snapshot = list(blackbox_bench._bench._global_registry)
     yield
-    pybench._bench._global_registry[:] = snapshot
+    blackbox_bench._bench._global_registry[:] = snapshot
 
 
 @pytest.fixture
@@ -24,9 +24,9 @@ def fast_bench():
             bench = fast_bench(iterations=3)      # override
     """
 
-    def _build(**kwargs) -> pybench.Bench:
+    def _build(**kwargs) -> blackbox_bench.Bench:
         defaults = {"warmup": 0, "target_time_ns": 10_000_000}
         defaults.update(kwargs)
-        return pybench.Bench(**defaults)
+        return blackbox_bench.Bench(**defaults)
 
     return _build

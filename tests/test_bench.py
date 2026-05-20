@@ -1,8 +1,8 @@
-import pybench
+import blackbox_bench
 
 
 def test_bench_decorator_registers_and_runs():
-    bench = pybench.Bench(warmup=1, target_time_ns=20_000_000)
+    bench = blackbox_bench.Bench(warmup=1, target_time_ns=20_000_000)
 
     @bench.benchmark
     def f():
@@ -14,7 +14,7 @@ def test_bench_decorator_registers_and_runs():
 
 
 def test_bench_decorator_with_options():
-    bench = pybench.Bench(warmup=1, target_time_ns=20_000_000)
+    bench = blackbox_bench.Bench(warmup=1, target_time_ns=20_000_000)
 
     @bench.benchmark(name="custom", iterations=5)
     def g():
@@ -26,7 +26,7 @@ def test_bench_decorator_with_options():
 
 
 def test_bench_measure_context_manager():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
     with bench.measure("section"):
         sum(range(1000))
     results = bench.run()
@@ -35,17 +35,17 @@ def test_bench_measure_context_manager():
 
 
 def test_module_level_benchmark_decorator():
-    pybench._bench._global_registry.clear()
+    blackbox_bench._bench._global_registry.clear()
 
-    @pybench.benchmark
+    @blackbox_bench.benchmark
     def h():
         pass
 
-    assert any(name == "h" for name, _, _ in pybench._bench._global_registry)
+    assert any(name == "h" for name, _, _ in blackbox_bench._bench._global_registry)
 
 
 def test_parameterized_benchmark_records_param():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark(params=[10, 100, 1000])
     def hashing(n):
@@ -58,7 +58,7 @@ def test_parameterized_benchmark_records_param():
 
 
 def test_throughput_recorded_on_result():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark(throughput=1024.0)
     def hashing():
@@ -70,7 +70,7 @@ def test_throughput_recorded_on_result():
 
 
 def test_bench_decorator_per_benchmark_warmup_override():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark(warmup=3, iterations=2)
     def f():
@@ -81,7 +81,7 @@ def test_bench_decorator_per_benchmark_warmup_override():
 
 
 def test_bench_decorator_parenthesised_no_args():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark()
     def f():
@@ -92,30 +92,30 @@ def test_bench_decorator_parenthesised_no_args():
 
 
 def test_module_level_benchmark_parenthesised_no_args():
-    pybench._bench._global_registry.clear()
+    blackbox_bench._bench._global_registry.clear()
 
-    @pybench.benchmark()
+    @blackbox_bench.benchmark()
     def k():
         pass
 
-    assert any(name == "k" for name, _, _ in pybench._bench._global_registry)
+    assert any(name == "k" for name, _, _ in blackbox_bench._bench._global_registry)
 
 
 def test_module_level_benchmark_explicit_kwargs():
     """The module-level @benchmark forwards each named kwarg into opts."""
-    pybench._bench._global_registry.clear()
+    blackbox_bench._bench._global_registry.clear()
 
-    @pybench.benchmark(iterations=5, warmup=2, throughput=1024.0, params=[1, 2])
+    @blackbox_bench.benchmark(iterations=5, warmup=2, throughput=1024.0, params=[1, 2])
     def m():
         pass
 
-    name, _fn, opts = pybench._bench._global_registry[-1]
+    name, _fn, opts = blackbox_bench._bench._global_registry[-1]
     assert name == "m"
     assert opts == {"iterations": 5, "warmup": 2, "throughput": 1024.0, "params": [1, 2]}
 
 
 def test_to_table_auto_runs_when_not_yet_run():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark
     def f():
@@ -128,7 +128,7 @@ def test_to_table_auto_runs_when_not_yet_run():
 def test_to_json_auto_runs_when_not_yet_run():
     import json as _json
 
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark
     def f():
@@ -139,7 +139,7 @@ def test_to_json_auto_runs_when_not_yet_run():
 
 
 def test_to_html_auto_runs_when_not_yet_run():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark
     def f():
@@ -150,7 +150,7 @@ def test_to_html_auto_runs_when_not_yet_run():
 
 
 def test_to_xml_auto_runs_when_not_yet_run():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark
     def f():
@@ -161,7 +161,7 @@ def test_to_xml_auto_runs_when_not_yet_run():
 
 
 def test_report_each_format_to_stdout(capsys):
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark
     def f():
@@ -176,7 +176,7 @@ def test_report_each_format_to_stdout(capsys):
 
 
 def test_report_to_file(tmp_path):
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark
     def f():
@@ -189,7 +189,7 @@ def test_report_to_file(tmp_path):
 
 
 def test_report_unknown_format_raises():
-    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, target_time_ns=10_000_000)
 
     @bench.benchmark
     def f():
@@ -205,7 +205,7 @@ def test_report_unknown_format_raises():
 def test_partial_results_survive_benchmark_exception():
     """When a later benchmark raises, the earlier completed results stay on
     self._results so the user can call .report() / .to_json() on what ran."""
-    bench = pybench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000)
 
     @bench.benchmark
     def ok():
@@ -227,12 +227,12 @@ def test_partial_results_survive_benchmark_exception():
 
 def test_runner_not_in_public_all():
     """Runner is importable but not part of the stability contract."""
-    assert "Runner" not in pybench.__all__
-    assert hasattr(pybench, "Runner")  # still importable for advanced users
+    assert "Runner" not in blackbox_bench.__all__
+    assert hasattr(blackbox_bench, "Runner")  # still importable for advanced users
 
 
 def test_iter_batched_with_warmup_runs_setup_in_warmup_phase():
-    bench = pybench.Bench(warmup=2, iterations=3, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=2, iterations=3, target_time_ns=10_000_000)
     setup_calls = [0]
 
     @bench.benchmark
@@ -252,7 +252,7 @@ def test_iter_batched_with_warmup_runs_setup_in_warmup_phase():
 
 
 def test_iter_batched_with_histogram_populates_result():
-    bench = pybench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000, histogram=True)
+    bench = blackbox_bench.Bench(warmup=0, iterations=3, target_time_ns=10_000_000, histogram=True)
 
     @bench.benchmark
     def t():
@@ -269,7 +269,7 @@ def test_iter_batched_with_histogram_populates_result():
 
 
 def test_iter_batched_setup_runs_per_sample_not_per_call():
-    bench = pybench.Bench(warmup=0, iterations=5, target_time_ns=10_000_000)
+    bench = blackbox_bench.Bench(warmup=0, iterations=5, target_time_ns=10_000_000)
     setup_calls = [0]
     routine_calls = [0]
 

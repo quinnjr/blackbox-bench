@@ -1,4 +1,4 @@
-"""pybench CLI."""
+"""blackbox_bench CLI."""
 from __future__ import annotations
 
 import argparse
@@ -11,7 +11,7 @@ import tempfile
 import textwrap
 from pathlib import Path
 
-from pybench._bench import Bench, _global_registry
+from blackbox_bench._bench import Bench, _global_registry
 
 
 # Pre-baked profiling harness. The benchmark path + function name are passed as
@@ -102,7 +102,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 
 def _cmd_compare(args: argparse.Namespace) -> int:
-    from pybench._pybench import compare
+    from blackbox_bench._blackbox_bench import compare
 
     baseline = Path(args.baseline).read_text()
     current = Path(args.current).read_text()
@@ -129,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
             # capturing wrapper handles unicode correctly, so this is fine.
             pass
 
-    p = argparse.ArgumentParser(prog="pybench")
+    p = argparse.ArgumentParser(prog="blackbox_bench")
     sub = p.add_subparsers(dest="command", required=True)
 
     r = sub.add_parser("run")

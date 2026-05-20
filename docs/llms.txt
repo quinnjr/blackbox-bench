@@ -1,24 +1,24 @@
-# pybench
+# blackbox-bench
 
 A lightweight Python microbenchmarking library with a Rust core (PyO3).
 
 ## Top-level exports
-- pybench.Bench(warmup, target_time_ns, iterations, confidence_level,
+- blackbox_bench.Bench(warmup, target_time_ns, iterations, confidence_level,
   outlier_method, overhead_subtract, histogram, seed)
-- pybench.benchmark — module-level decorator
-- pybench.black_box — opaque pass-through (prevents constant folding)
-- pybench.BenchmarkResult — frozen result class with statistical fields
-- pybench.HdrHistogram — opt-in HDR histogram
-- pybench.compare(baseline_json, current_json) -> ComparisonReport
-- pybench.Runner — low-level entry point (usually not needed)
+- blackbox_bench.benchmark — module-level decorator
+- blackbox_bench.black_box — opaque pass-through (prevents constant folding)
+- blackbox_bench.BenchmarkResult — frozen result class with statistical fields
+- blackbox_bench.HdrHistogram — opt-in HDR histogram
+- blackbox_bench.compare(baseline_json, current_json) -> ComparisonReport
+- blackbox_bench.Runner — low-level entry point (usually not needed)
 
 ## CLI
 
 ```
-pybench run [PATH] [--warmup N] [--iterations N] [--target-time-ns N]
+blackbox-bench run [PATH] [--warmup N] [--iterations N] [--target-time-ns N]
             [--format {table,json,html,xml}] [--xml-style {junit,raw}]
             [--output FILE] [--save FILE] [--profile]
-pybench compare BASELINE CURRENT [--format ...] [--output FILE]
+blackbox-bench compare BASELINE CURRENT [--format ...] [--output FILE]
 ```
 
 ## Features
@@ -35,5 +35,5 @@ pybench compare BASELINE CURRENT [--format ...] [--output FILE]
 
 ## Links
 
-- [Documentation](https://quinnjr.github.io/pybench/)
-- [GitHub Repository](https://github.com/quinnjr/pybench)
+- [Documentation](https://quinnjr.github.io/blackbox-bench/)
+- [GitHub Repository](https://github.com/quinnjr/blackbox-bench)

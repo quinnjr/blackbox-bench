@@ -130,13 +130,15 @@ pub fn bootstrap_ci_mean(
     let n = xs.len();
     means_scratch.clear();
     means_scratch.reserve(n_resamples);
+    // SAFETY: `rng.usize(..n)` always returns an index in [0, n), and
+    // `xs.len() == n`, so the unchecked index is sound. i128 accumulator
+    // keeps the sum overflow-safe for pathological inputs.
+    let xs_ptr = xs.as_ptr();
     for _ in 0..n_resamples {
-        // i128 accumulator: a single u64 sum could plausibly approach i64::MAX
-        // for very long benchmarks (e.g. 10^9 ns × 10^9 samples). i128 has
-        // headroom for any realistic timing run.
         let mut sum: i128 = 0;
         for _ in 0..n {
-            sum += xs[rng.usize(..n)] as i128;
+            let idx = rng.usize(..n);
+            sum += unsafe { *xs_ptr.add(idx) } as i128;
         }
         means_scratch.push(sum as f64 / n as f64);
     }

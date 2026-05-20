@@ -2,10 +2,10 @@ use pyo3::prelude::*;
 
 mod black_box;
 mod compare;
-mod histogram;
-mod report;
-mod runner;
-mod stats;
+pub mod histogram;
+pub mod report;
+pub mod runner;
+pub mod stats;
 
 #[pymodule]
 fn _pybench(m: &Bound<'_, PyModule>) -> PyResult<()> {

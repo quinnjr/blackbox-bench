@@ -128,15 +128,15 @@ fn sparkline_svg(samples: &[i64]) -> String {
     }
     let cmax = *counts.iter().max().unwrap() as f64;
     let bin_w = width as f64 / bins as f64;
-    let mut path = String::from("M0 ");
-    path.push_str(&format!("{}", height));
+    let mut path = String::with_capacity(16 + bins * 24);
+    let _ = write!(path, "M0 {}", height);
     for (i, &c) in counts.iter().enumerate() {
         let h = (c as f64 / cmax) * (height as f64 - 2.0);
         let x = (i as f64) * bin_w;
-        path.push_str(&format!(" L{:.2} {:.2}", x, height as f64 - h));
-        path.push_str(&format!(" L{:.2} {:.2}", x + bin_w, height as f64 - h));
+        let _ = write!(path, " L{:.2} {:.2}", x, height as f64 - h);
+        let _ = write!(path, " L{:.2} {:.2}", x + bin_w, height as f64 - h);
     }
-    path.push_str(&format!(" L{} {} Z", width, height));
+    let _ = write!(path, " L{} {} Z", width, height);
     format!(
         "<svg class=\"spark\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\"><path d=\"{p}\" fill=\"#88a\"/></svg>",
         w = width,
@@ -162,7 +162,7 @@ pub fn format_html_refs(results: &[&BenchmarkResult], metadata: &str) -> String 
     s.push_str(".unchanged{background:#eef;color:#226;}\n");
     s.push_str("</style></head><body>\n");
     s.push_str("<h1>pybench results</h1>\n");
-    s.push_str(&format!("<pre>{}</pre>\n", html_escape(metadata)));
+    let _ = write!(s, "<pre>{}</pre>\n", html_escape(metadata));
     s.push_str("<table><thead><tr>");
     for h in [
         "Name",
@@ -176,25 +176,26 @@ pub fn format_html_refs(results: &[&BenchmarkResult], metadata: &str) -> String 
         "Outliers",
         "Distribution",
     ] {
-        s.push_str(&format!("<th>{}</th>", html_escape(h)));
+        let _ = write!(s, "<th>{}</th>", html_escape(h));
     }
     s.push_str("</tr></thead><tbody>\n");
     for r in results {
         s.push_str("<tr>");
-        s.push_str(&format!("<td>{}</td>", html_escape(&r.name)));
-        s.push_str(&format!("<td>{}</td>", fmt_time(r.mean_ns)));
-        s.push_str(&format!("<td>{}</td>", fmt_time(r.median_ns)));
-        s.push_str(&format!("<td>{}</td>", fmt_time(r.stddev_ns)));
-        s.push_str(&format!("<td>{}</td>", fmt_time(r.min_ns as f64)));
-        s.push_str(&format!("<td>{}</td>", fmt_time(r.max_ns as f64)));
-        s.push_str(&format!("<td>{:.0}</td>", r.ops_per_sec));
-        s.push_str(&format!(
+        let _ = write!(s, "<td>{}</td>", html_escape(&r.name));
+        let _ = write!(s, "<td>{}</td>", fmt_time(r.mean_ns));
+        let _ = write!(s, "<td>{}</td>", fmt_time(r.median_ns));
+        let _ = write!(s, "<td>{}</td>", fmt_time(r.stddev_ns));
+        let _ = write!(s, "<td>{}</td>", fmt_time(r.min_ns as f64));
+        let _ = write!(s, "<td>{}</td>", fmt_time(r.max_ns as f64));
+        let _ = write!(s, "<td>{:.0}</td>", r.ops_per_sec);
+        let _ = write!(
+            s,
             "<td>[{}, {}]</td>",
             fmt_time(r.ci95_low_ns),
             fmt_time(r.ci95_high_ns)
-        ));
-        s.push_str(&format!("<td>{}</td>", r.outliers));
-        s.push_str(&format!("<td>{}</td>", sparkline_svg(&r.times_ns)));
+        );
+        let _ = write!(s, "<td>{}</td>", r.outliers);
+        let _ = write!(s, "<td>{}</td>", sparkline_svg(&r.times_ns));
         s.push_str("</tr>\n");
     }
     s.push_str("</tbody></table></body></html>\n");
@@ -232,16 +233,18 @@ fn result_to_json_inline(r: &BenchmarkResult) -> String {
 fn format_xml_junit(results: &[&BenchmarkResult]) -> String {
     let mut s = String::with_capacity(1024);
     s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-    s.push_str(&format!(
+    let _ = write!(
+        s,
         "<testsuite name=\"pybench\" tests=\"{}\" failures=\"0\">\n",
         results.len(),
-    ));
+    );
     for r in results {
-        s.push_str(&format!(
+        let _ = write!(
+            s,
             "  <testcase name=\"{}\" time=\"{:.9}\">\n",
             xml_escape(&r.name),
             r.mean_ns / 1_000_000_000.0,
-        ));
+        );
         s.push_str("    <system-out><![CDATA[");
         s.push_str(&cdata_safe(&result_to_json_inline(r)));
         s.push_str("]]></system-out>\n");
@@ -255,7 +258,8 @@ fn format_xml_raw(results: &[&BenchmarkResult]) -> String {
     let mut s = String::with_capacity(1024);
     s.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<pybench>\n  <results>\n");
     for r in results {
-        s.push_str(&format!(
+        let _ = write!(
+            s,
             "    <result name=\"{}\" iterations=\"{}\" mean_ns=\"{}\" median_ns=\"{}\" \
              ci95_low_ns=\"{}\" ci95_high_ns=\"{}\" outliers=\"{}\"/>\n",
             xml_escape(&r.name),
@@ -265,7 +269,7 @@ fn format_xml_raw(results: &[&BenchmarkResult]) -> String {
             r.ci95_low_ns,
             r.ci95_high_ns,
             r.outliers,
-        ));
+        );
     }
     s.push_str("  </results>\n</pybench>\n");
     s
@@ -299,23 +303,26 @@ pub fn format_comparison_json(rows: &[DiffRowView]) -> String {
     let mut s = String::from("{\"rows\":[");
     for (i, d) in rows.iter().enumerate() {
         s.push_str("{");
-        s.push_str(&format!("\"name\":{},", json_str(&d.name)));
+        let _ = write!(s, "\"name\":{},", json_str(&d.name));
         match d.baseline_mean_ns {
-            Some(v) => s.push_str(&format!("\"baseline_mean_ns\":{},", v)),
+            Some(v) => {
+                let _ = write!(s, "\"baseline_mean_ns\":{},", v);
+            }
             None => s.push_str("\"baseline_mean_ns\":null,"),
         }
         match d.current_mean_ns {
-            Some(v) => s.push_str(&format!("\"current_mean_ns\":{},", v)),
+            Some(v) => {
+                let _ = write!(s, "\"current_mean_ns\":{},", v);
+            }
             None => s.push_str("\"current_mean_ns\":null,"),
         }
         match d.change_pct {
-            Some(v) => s.push_str(&format!("\"change_pct\":{},", v)),
+            Some(v) => {
+                let _ = write!(s, "\"change_pct\":{},", v);
+            }
             None => s.push_str("\"change_pct\":null,"),
         }
-        s.push_str(&format!(
-            "\"classification\":{}",
-            json_str(&d.classification)
-        ));
+        let _ = write!(s, "\"classification\":{}", json_str(&d.classification));
         s.push('}');
         if i + 1 < rows.len() {
             s.push(',');
@@ -336,34 +343,34 @@ pub fn format_comparison_html(rows: &[DiffRowView]) -> String {
     s.push_str(".regressed{color:#900;font-weight:600;}.improved{color:#070;font-weight:600;}.unchanged{color:#446;}");
     s.push_str("</style></head><body><h1>pybench comparison</h1><table><thead><tr>");
     for h in ["Name", "Baseline", "Current", "Change", "Status"] {
-        s.push_str(&format!("<th>{}</th>", html_escape(h)));
+        let _ = write!(s, "<th>{}</th>", html_escape(h));
     }
     s.push_str("</tr></thead><tbody>");
     for d in rows {
         s.push_str("<tr>");
-        s.push_str(&format!("<td>{}</td>", html_escape(&d.name)));
-        s.push_str(&format!(
+        let _ = write!(s, "<td>{}</td>", html_escape(&d.name));
+        let _ = write!(
+            s,
             "<td>{}</td>",
             d.baseline_mean_ns
                 .map(fmt_time)
                 .unwrap_or_else(|| "N/A".into())
-        ));
-        s.push_str(&format!(
+        );
+        let _ = write!(
+            s,
             "<td>{}</td>",
             d.current_mean_ns
                 .map(fmt_time)
                 .unwrap_or_else(|| "N/A".into())
-        ));
-        s.push_str(&format!(
+        );
+        let _ = write!(
+            s,
             "<td>{}</td>",
             d.change_pct
                 .map(|p| format!("{:+.1}%", p))
                 .unwrap_or_else(|| "N/A".into())
-        ));
-        s.push_str(&format!(
-            "<td class=\"{cls}\">{cls}</td>",
-            cls = d.classification
-        ));
+        );
+        let _ = write!(s, "<td class=\"{cls}\">{cls}</td>", cls = d.classification);
         s.push_str("</tr>");
     }
     s.push_str("</tbody></table></body></html>");
@@ -380,28 +387,32 @@ pub fn format_comparison_xml(rows: &[DiffRowView]) -> String {
         .iter()
         .filter(|d| d.classification == "regressed")
         .collect();
-    s.push_str(&format!(
+    let _ = write!(
+        s,
         "<testsuite name=\"pybench\" tests=\"{}\" failures=\"{}\">\n",
         rows.len(),
         failures.len(),
-    ));
+    );
     for d in rows {
         let mean = d.current_mean_ns.unwrap_or(0.0);
-        s.push_str(&format!(
+        let _ = write!(
+            s,
             "  <testcase name=\"{}\" time=\"{:.9}\">\n",
             xml_escape(&d.name),
             mean / 1_000_000_000.0,
-        ));
+        );
         if d.classification == "regressed" {
-            s.push_str(&format!(
+            let _ = write!(
+                s,
                 "    <failure message=\"regression: {:+.1}% (CI disjoint from baseline)\"/>\n",
                 d.change_pct.unwrap_or(0.0),
-            ));
+            );
         }
-        s.push_str(&format!(
+        let _ = write!(
+            s,
             "    <system-out><![CDATA[{{\"classification\":{}}}]]></system-out>\n",
             json_str(&d.classification),
-        ));
+        );
         s.push_str("  </testcase>\n");
     }
     s.push_str("</testsuite>\n");

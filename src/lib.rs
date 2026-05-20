@@ -1,7 +1,9 @@
 use pyo3::prelude::*;
 
 mod black_box;
+mod compare;
 mod histogram;
+mod report;
 mod runner;
 mod stats;
 
@@ -13,5 +15,8 @@ fn _pybench(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<runner::IterBatched>()?;
     m.add_class::<histogram::HdrHistogram>()?;
     m.add_function(wrap_pyfunction!(runner::_synthesize, m)?)?;
+    m.add_class::<compare::ComparisonReport>()?;
+    m.add_class::<compare::DiffRow>()?;
+    m.add_function(wrap_pyfunction!(compare::compare, m)?)?;
     Ok(())
 }

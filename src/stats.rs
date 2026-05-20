@@ -124,11 +124,16 @@ pub fn bootstrap_ci_mean(
         }
         means.push(sum as f64 / n as f64);
     }
-    means.sort_by(|a, b| a.partial_cmp(b).unwrap());
     let alpha = (1.0 - level) / 2.0;
     let lo_idx = (alpha * n_resamples as f64) as usize;
     let hi_idx = (((1.0 - alpha) * n_resamples as f64) as usize).min(n_resamples - 1);
-    (means[lo_idx], means[hi_idx])
+    // Partial-partition twice: O(n) instead of the O(n log n) we'd pay for a
+    // full sort, since we only need two order statistics.
+    let cmp = |a: &f64, b: &f64| a.partial_cmp(b).unwrap();
+    let (_, lo, _) = means.select_nth_unstable_by(lo_idx, cmp);
+    let lo_value = *lo;
+    let (_, hi, _) = means.select_nth_unstable_by(hi_idx, cmp);
+    (lo_value, *hi)
 }
 
 #[cfg(test)]

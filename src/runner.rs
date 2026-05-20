@@ -460,9 +460,19 @@ pub fn _synthesize(py: Python<'_>, name: String, elapsed_ns: i64) -> BenchmarkRe
 }
 
 pub fn run_batch(py: Python<'_>, fn_: &PyObject, batch_size: usize) -> PyResult<u128> {
+    // Raw FFI call — saves the PyObject::call0 → Bound::call0 → PyObject_CallNoArgs
+    // indirection on every measured iteration. For sub-100ns benchmarks the
+    // savings are a measurable fraction of harness overhead.
+    let fn_ptr = fn_.as_ptr();
     let start = Instant::now();
     for _ in 0..batch_size {
-        fn_.call0(py)?;
+        // SAFETY: fn_ptr derives from a live PyObject reference we hold; null
+        // return signals an exception (no reference to DECREF).
+        let result = unsafe { ffi::PyObject_CallNoArgs(fn_ptr) };
+        if result.is_null() {
+            return Err(PyErr::fetch(py));
+        }
+        unsafe { ffi::Py_DECREF(result) };
     }
     Ok(start.elapsed().as_nanos())
 }

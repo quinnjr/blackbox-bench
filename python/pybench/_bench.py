@@ -1,10 +1,19 @@
 """High-level Bench orchestrator over the Rust Runner."""
 from __future__ import annotations
 
+import platform
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from typing import Any, Callable, Iterator
 
-from pybench._pybench import BenchmarkResult, IterBatched, Runner, _synthesize
+from pybench._pybench import (
+    BenchmarkResult,
+    IterBatched,
+    Runner,
+    _format_results_json,
+    _format_results_table,
+    _synthesize,
+)
 
 _global_registry: list[tuple[str, Callable[..., Any], dict[str, Any]]] = []
 
@@ -95,6 +104,37 @@ class Bench:
                 results.append(runner.run(name, fn, throughput, None))
         self._results = results
         return results
+
+    def to_table(self) -> str:
+        if not self._results:
+            self.run()
+        return _format_results_table(self._results)
+
+    def to_json(self) -> str:
+        if not self._results:
+            self.run()
+        metadata = (
+            '{"python_version": "%s", "platform": "%s", "timestamp": "%s", "pybench_version": "1.0.0a1"}'
+            % (
+                platform.python_version(),
+                platform.system(),
+                datetime.now(timezone.utc).isoformat(),
+            )
+        )
+        return _format_results_json(self._results, metadata)
+
+    def report(self, format: str = "table", path: str | None = None) -> None:
+        if format == "table":
+            text = self.to_table()
+        elif format == "json":
+            text = self.to_json()
+        else:
+            raise ValueError(f"unknown format: {format}")
+        if path:
+            with open(path, "w") as f:
+                f.write(text)
+        else:
+            print(text)
 
     def _make_runner(self, opts: dict[str, Any] | None = None) -> Runner:
         opts = opts or {}

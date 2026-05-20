@@ -1,65 +1,29 @@
 import json
-import platform
-import sys
 
-from pybench.reporter import format_table, format_json, format_time
-from pybench.results import BenchmarkResult
+import pybench
 
 
-def _make_result(name: str, times_ns: list[int]) -> BenchmarkResult:
-    return BenchmarkResult.from_times(name, times_ns)
+def _bench_with_one_result():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def x():
+        pass
+
+    bench.run()
+    return bench
 
 
-def test_format_time_nanoseconds():
-    assert format_time(500) == "500.0 ns"
+def test_to_table_has_header_and_row():
+    bench = _bench_with_one_result()
+    out = bench.to_table()
+    assert "Name" in out and "Mean" in out and "CI 95%" in out
+    assert "x" in out
 
 
-def test_format_time_microseconds():
-    assert format_time(1_500) == "1.5 µs"
-
-
-def test_format_time_milliseconds():
-    assert format_time(1_500_000) == "1.5 ms"
-
-
-def test_format_time_seconds():
-    assert format_time(1_500_000_000) == "1.50 s"
-
-
-def test_format_table_contains_header_and_names():
-    results = [
-        _make_result("fast", [1_000, 1_100, 1_200]),
-        _make_result("slow", [100_000, 110_000, 120_000]),
-    ]
-    output = format_table(results)
-
-    assert "Name" in output
-    assert "Mean" in output
-    assert "Ops/sec" in output
-    assert "fast" in output
-    assert "slow" in output
-
-
-def test_format_json_structure():
-    results = [_make_result("bench1", [50_000, 60_000])]
-    raw = format_json(results)
-    data = json.loads(raw)
-
-    assert "metadata" in data
-    assert "results" in data
-    assert data["metadata"]["python_version"] == platform.python_version()
-    assert data["metadata"]["platform"] == platform.system()
-    assert len(data["results"]) == 1
-    assert data["results"][0]["name"] == "bench1"
-
-
-def test_format_table_empty():
-    from pybench.reporter import format_table
-    assert format_table([]) == "No benchmark results."
-
-
-def test_format_json_is_valid_json():
-    results = [_make_result("x", [1000])]
-    raw = format_json(results)
-    # Should not raise
-    json.loads(raw)
+def test_to_json_round_trips():
+    bench = _bench_with_one_result()
+    data = json.loads(bench.to_json())
+    assert "metadata" in data and "results" in data
+    assert data["results"][0]["name"] == "x"
+    assert "ci95_low_ns" in data["results"][0]

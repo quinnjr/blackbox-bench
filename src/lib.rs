@@ -18,5 +18,7 @@ fn _pybench(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<compare::ComparisonReport>()?;
     m.add_class::<compare::DiffRow>()?;
     m.add_function(wrap_pyfunction!(compare::compare, m)?)?;
+    m.add_function(wrap_pyfunction!(report::_format_results_table, m)?)?;
+    m.add_function(wrap_pyfunction!(report::_format_results_json, m)?)?;
     Ok(())
 }

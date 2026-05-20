@@ -6,3 +6,9 @@ dist/
 build/
 .venv/
 *.so
+target/
+.coverage
+*.profraw
+htmlcov/
+.claude/
+

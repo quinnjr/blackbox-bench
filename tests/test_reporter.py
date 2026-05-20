@@ -1,65 +1,165 @@
 import json
-import platform
-import sys
 
-from pybench.reporter import format_table, format_json, format_time
-from pybench.results import BenchmarkResult
+import pybench
 
 
-def _make_result(name: str, times_ns: list[int]) -> BenchmarkResult:
-    return BenchmarkResult.from_times(name, times_ns)
+def _bench_with_one_result():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+
+    @bench.benchmark
+    def x():
+        pass
+
+    bench.run()
+    return bench
 
 
-def test_format_time_nanoseconds():
-    assert format_time(500) == "500.0 ns"
+def test_to_table_has_header_and_row():
+    bench = _bench_with_one_result()
+    out = bench.to_table()
+    assert "Name" in out and "Mean" in out and "CI 95%" in out
+    assert "x" in out
 
 
-def test_format_time_microseconds():
-    assert format_time(1_500) == "1.5 µs"
+def test_to_json_round_trips():
+    bench = _bench_with_one_result()
+    data = json.loads(bench.to_json())
+    assert "metadata" in data and "results" in data
+    assert data["results"][0]["name"] == "x"
+    assert "ci95_low_ns" in data["results"][0]
 
 
-def test_format_time_milliseconds():
-    assert format_time(1_500_000) == "1.5 ms"
+def test_to_html_self_contained_no_external_refs():
+    bench = _bench_with_one_result()
+    html = bench.to_html()
+    assert "<html" in html.lower() and "</html>" in html.lower()
+    assert "x" in html
+    assert "ci 95%" in html.lower()
+    assert "http://" not in html and "https://" not in html
+    assert "cdn." not in html.lower()
 
 
-def test_format_time_seconds():
-    assert format_time(1_500_000_000) == "1.50 s"
+def test_to_html_includes_sparkline_svg():
+    bench = _bench_with_one_result()
+    html = bench.to_html()
+    assert "<svg" in html and "<path" in html
 
 
-def test_format_table_contains_header_and_names():
-    results = [
-        _make_result("fast", [1_000, 1_100, 1_200]),
-        _make_result("slow", [100_000, 110_000, 120_000]),
-    ]
-    output = format_table(results)
+def test_to_xml_default_is_junit_compatible():
+    import xml.etree.ElementTree as ET
 
-    assert "Name" in output
-    assert "Mean" in output
-    assert "Ops/sec" in output
-    assert "fast" in output
-    assert "slow" in output
-
-
-def test_format_json_structure():
-    results = [_make_result("bench1", [50_000, 60_000])]
-    raw = format_json(results)
-    data = json.loads(raw)
-
-    assert "metadata" in data
-    assert "results" in data
-    assert data["metadata"]["python_version"] == platform.python_version()
-    assert data["metadata"]["platform"] == platform.system()
-    assert len(data["results"]) == 1
-    assert data["results"][0]["name"] == "bench1"
+    bench = _bench_with_one_result()
+    xml = bench.to_xml()
+    tree = ET.fromstring(xml)
+    assert tree.tag == "testsuite"
+    cases = tree.findall("testcase")
+    assert len(cases) == 1
+    assert cases[0].get("name") == "x"
+    sysout = cases[0].find("system-out")
+    assert sysout is not None and sysout.text and "mean_ns" in sysout.text
 
 
-def test_format_table_empty():
-    from pybench.reporter import format_table
-    assert format_table([]) == "No benchmark results."
+def test_to_table_empty_results():
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    out = bench.to_table()
+    assert "No benchmark results" in out
 
 
-def test_format_json_is_valid_json():
-    results = [_make_result("x", [1000])]
-    raw = format_json(results)
-    # Should not raise
-    json.loads(raw)
+def test_fmt_time_units_renders_milliseconds():
+    """The table renders the right unit tier without needing a real sleep."""
+    from pybench._pybench import _synthesize
+
+    bench = pybench.Bench(warmup=0, target_time_ns=10_000_000)
+    # 5 ms — well into the ms tier.
+    bench._results.append(_synthesize("slow", 5_000_000))
+
+    out = bench.to_table()
+    assert "ms" in out
+    assert "slow" in out
+
+
+def test_json_str_escapes_in_name():
+    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+
+    @bench.benchmark(name='quoted"\\back\nnewline\ttab\x01ctrl')
+    def f():
+        pass
+
+    data = json.loads(bench.to_json())
+    assert data["results"][0]["name"] == 'quoted"\\back\nnewline\ttab\x01ctrl'
+
+
+def test_html_escape_special_chars_in_name():
+    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+
+    @bench.benchmark(name='<script>&"\'')
+    def f():
+        pass
+
+    html = bench.to_html()
+    assert "&lt;script&gt;" in html
+    assert "&amp;" in html
+    assert "&quot;" in html
+    assert "&#39;" in html
+
+
+def test_xml_cdata_safe_against_terminator_in_payload():
+    """A benchmark name containing ']]>' must not terminate the CDATA section."""
+    import xml.etree.ElementTree as ET
+
+    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+
+    @bench.benchmark(name="foo]]>bar")
+    def f():
+        pass
+
+    xml = bench.to_xml()
+    # If CDATA were broken, ET.fromstring would either raise or parse extra elements
+    tree = ET.fromstring(xml)
+    cases = tree.findall("testcase")
+    assert len(cases) == 1
+    assert cases[0].get("name") == "foo]]>bar"
+
+
+def test_xml_escape_special_chars_in_name():
+    bench = pybench.Bench(warmup=0, iterations=2, target_time_ns=5_000_000)
+
+    @bench.benchmark(name='<x>&"\'')
+    def f():
+        pass
+
+    xml = bench.to_xml()
+    assert "&lt;x&gt;" in xml
+    assert "&amp;" in xml
+    assert "&quot;" in xml
+    assert "&apos;" in xml
+
+
+def test_json_includes_throughput_when_set():
+    # overhead_subtract=False so the tiny benchmark isn't zeroed out (which
+    # would yield ops_per_sec=Infinity and a null throughput in JSON).
+    bench = pybench.Bench(
+        warmup=0, iterations=3, target_time_ns=10_000_000, overhead_subtract=False,
+    )
+
+    @bench.benchmark(throughput=1024.0)
+    def hashing():
+        b"x" * 1024
+
+    data = json.loads(bench.to_json())
+    assert data["results"][0]["throughput_per_sec"] is not None
+    assert data["results"][0]["throughput_per_sec"] > 0
+
+
+def test_to_xml_raw_mirrors_json_structure():
+    import xml.etree.ElementTree as ET
+
+    bench = _bench_with_one_result()
+    xml = bench.to_xml(style="raw")
+    tree = ET.fromstring(xml)
+    assert tree.tag == "pybench"
+    results = tree.find("results")
+    assert results is not None
+    rows = results.findall("result")
+    assert len(rows) == 1
+    assert rows[0].get("name") == "x"

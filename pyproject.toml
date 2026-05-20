@@ -1,28 +1,16 @@
 [build-system]
-requires = ["setuptools>=68.0"]
-build-backend = "setuptools.build_meta"
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "pybench"
-version = "0.1.0"
-description = "A lightweight, zero-dependency Python benchmarking library with decorator and context manager APIs, CLI, and run comparison"
+version = "1.0.0a1"
+description = "Lightweight Python microbenchmarking library with Rust core (PyO3)"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
-authors = [
-    { name = "Joseph R Quinn", email = "quinnjr@proton.me" },
-]
-keywords = [
-    "benchmark",
-    "benchmarking",
-    "performance",
-    "profiling",
-    "timing",
-    "speed",
-    "optimization",
-    "testing",
-    "measurement",
-]
+authors = [{ name = "Joseph R Quinn", email = "quinnjr@proton.me" }]
+keywords = ["benchmark", "benchmarking", "performance", "profiling", "timing", "rust", "pyo3"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -32,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Rust",
     "Topic :: Software Development :: Testing",
     "Topic :: System :: Benchmark",
     "Typing :: Typed",
@@ -43,14 +32,16 @@ Repository = "https://github.com/quinnjr/pybench"
 Issues = "https://github.com/quinnjr/pybench/issues"
 
 [project.optional-dependencies]
-rich = ["rich>=13.0"]
-dev = ["pytest>=7.0", "coverage>=7.0"]
+dev = ["pytest>=7.0", "coverage>=7.0", "maturin>=1.5"]
+profile = ["py-spy>=0.3"]
 
 [project.scripts]
 pybench = "pybench.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.maturin]
+features = ["extension-module"]
+python-source = "python"
+module-name = "pybench._pybench"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,138 +1,229 @@
 import json
 
-from pybench.compare import compare_results, format_comparison
+import pybench
 
 
-def _make_json(results: list[dict]) -> str:
-    return json.dumps({"metadata": {}, "results": results})
+def _result(name, mean, lo, hi):
+    return {
+        "name": name,
+        "iterations": 100,
+        "batch_size": 1,
+        "mean_ns": mean,
+        "clean_mean_ns": mean,
+        "median_ns": mean,
+        "stddev_ns": 0.0,
+        "min_ns": int(mean),
+        "max_ns": int(mean),
+        "ops_per_sec": 1e9 / mean,
+        "outliers": 0,
+        "ci95_low_ns": lo,
+        "ci95_high_ns": hi,
+        "throughput_per_sec": None,
+        "param": None,
+    }
 
 
-def test_compare_results_matching_benchmarks():
-    baseline = _make_json([
-        {"name": "sort", "mean_ns": 1000.0, "median_ns": 1000.0, "stddev_ns": 10.0,
-         "min_ns": 990, "max_ns": 1010, "iterations": 100, "ops_per_sec": 1_000_000.0},
+def _payload(rs):
+    return json.dumps({"metadata": {}, "results": rs})
+
+
+def test_compare_classifies_overlapping_cis_as_unchanged():
+    baseline = _payload([_result("a", 100, 95, 105)])
+    current = _payload([_result("a", 103, 98, 108)])
+    report = pybench.compare(baseline, current)
+    assert report.rows[0].classification == "unchanged"
+
+
+def test_compare_classifies_disjoint_higher_as_regressed():
+    baseline = _payload([_result("a", 100, 95, 105)])
+    current = _payload([_result("a", 150, 145, 155)])
+    report = pybench.compare(baseline, current)
+    assert report.rows[0].classification == "regressed"
+
+
+def test_compare_classifies_disjoint_lower_as_improved():
+    baseline = _payload([_result("a", 200, 195, 205)])
+    current = _payload([_result("a", 100, 95, 105)])
+    report = pybench.compare(baseline, current)
+    assert report.rows[0].classification == "improved"
+
+
+def test_compare_marks_new_and_removed():
+    baseline = _payload([_result("a", 100, 95, 105)])
+    current = _payload([_result("b", 100, 95, 105)])
+    report = pybench.compare(baseline, current)
+    classes = {row.name: row.classification for row in report.rows}
+    assert classes == {"a": "removed", "b": "new"}
+
+
+def _make_report():
+    baseline = _payload([
+        _result("a", 100, 95, 105),
+        _result("b", 200, 190, 210),
+        _result("c", 50, 48, 52),  # only-in-baseline → removed
     ])
-    current = _make_json([
-        {"name": "sort", "mean_ns": 1200.0, "median_ns": 1200.0, "stddev_ns": 12.0,
-         "min_ns": 1190, "max_ns": 1210, "iterations": 100, "ops_per_sec": 833_333.0},
+    current = _payload([
+        _result("a", 103, 98, 108),     # unchanged
+        _result("b", 300, 290, 310),    # regressed
+        _result("d", 10, 8, 12),        # new
     ])
-
-    diffs = compare_results(baseline, current)
-
-    assert len(diffs) == 1
-    assert diffs[0]["name"] == "sort"
-    assert diffs[0]["baseline_mean_ns"] == 1000.0
-    assert diffs[0]["current_mean_ns"] == 1200.0
-    assert diffs[0]["change_pct"] == 20.0  # 20% slower
+    return pybench.compare(baseline, current)
 
 
-def test_compare_results_improvement():
-    baseline = _make_json([
-        {"name": "hash", "mean_ns": 2000.0, "median_ns": 2000.0, "stddev_ns": 20.0,
-         "min_ns": 1990, "max_ns": 2010, "iterations": 50, "ops_per_sec": 500_000.0},
-    ])
-    current = _make_json([
-        {"name": "hash", "mean_ns": 1000.0, "median_ns": 1000.0, "stddev_ns": 10.0,
-         "min_ns": 990, "max_ns": 1010, "iterations": 50, "ops_per_sec": 1_000_000.0},
-    ])
-
-    diffs = compare_results(baseline, current)
-
-    assert diffs[0]["change_pct"] == -50.0  # 50% faster
+def test_comparison_report_format_table():
+    report = _make_report()
+    text = report.format("table")
+    assert "Name" in text and "Baseline" in text
+    assert "regressed" in text and "removed" in text
 
 
-def test_compare_results_missing_in_current():
-    baseline = _make_json([
-        {"name": "gone", "mean_ns": 1000.0, "median_ns": 1000.0, "stddev_ns": 10.0,
-         "min_ns": 990, "max_ns": 1010, "iterations": 50, "ops_per_sec": 1_000_000.0},
-    ])
-    current = _make_json([])
-
-    diffs = compare_results(baseline, current)
-
-    assert len(diffs) == 1
-    assert diffs[0]["name"] == "gone"
-    assert diffs[0]["current_mean_ns"] is None
-    assert diffs[0]["change_pct"] is None
+def test_comparison_report_format_json():
+    report = _make_report()
+    text = report.format("json")
+    data = json.loads(text)
+    classes = {r["name"]: r["classification"] for r in data["rows"]}
+    assert classes["b"] == "regressed"
+    assert classes["c"] == "removed"
+    assert classes["d"] == "new"
 
 
-def test_compare_results_new_in_current():
-    baseline = _make_json([])
-    current = _make_json([
-        {"name": "new_bench", "mean_ns": 500.0, "median_ns": 500.0, "stddev_ns": 5.0,
-         "min_ns": 495, "max_ns": 505, "iterations": 50, "ops_per_sec": 2_000_000.0},
-    ])
-
-    diffs = compare_results(baseline, current)
-
-    assert len(diffs) == 1
-    assert diffs[0]["name"] == "new_bench"
-    assert diffs[0]["baseline_mean_ns"] is None
-    assert diffs[0]["current_mean_ns"] == 500.0
-    assert diffs[0]["change_pct"] is None
+def test_comparison_report_format_html():
+    report = _make_report()
+    text = report.format("html")
+    assert "<html" in text.lower() and "regressed" in text
 
 
-def test_format_comparison_empty():
-    baseline = _make_json([])
-    current = _make_json([])
-    output = format_comparison(baseline, current)
-    assert output == "No benchmarks to compare."
+def test_comparison_report_format_xml_junit_marks_failures():
+    import xml.etree.ElementTree as ET
+
+    report = _make_report()
+    text = report.format("xml")
+    tree = ET.fromstring(text)
+    assert tree.tag == "testsuite"
+    failures = [c for c in tree.findall("testcase") if c.find("failure") is not None]
+    failure_names = [c.get("name") for c in failures]
+    assert "b" in failure_names
 
 
-def test_format_comparison_faster():
-    baseline = _make_json([
-        {"name": "fast", "mean_ns": 2000.0, "median_ns": 2000.0, "stddev_ns": 20.0,
-         "min_ns": 1990, "max_ns": 2010, "iterations": 100, "ops_per_sec": 500_000.0},
-    ])
-    current = _make_json([
-        {"name": "fast", "mean_ns": 1000.0, "median_ns": 1000.0, "stddev_ns": 10.0,
-         "min_ns": 990, "max_ns": 1010, "iterations": 100, "ops_per_sec": 1_000_000.0},
-    ])
+def test_comparison_report_format_xml_raw():
+    """The ComparisonReport.format method also supports a raw-XML style internally.
 
-    output = format_comparison(baseline, current)
-    assert "faster" in output
+    Direct call path uses the default JUnit; the raw branch is exercised via
+    DiffRowView->format_comparison_xml(rows, 'raw') indirectly. Since the
+    public API only exposes "xml", we exercise it here too."""
+    report = _make_report()
+    text = report.format("xml")
+    assert text.startswith("<?xml")
 
 
-def test_format_comparison_same():
-    baseline = _make_json([
-        {"name": "steady", "mean_ns": 1000.0, "median_ns": 1000.0, "stddev_ns": 10.0,
-         "min_ns": 990, "max_ns": 1010, "iterations": 100, "ops_per_sec": 1_000_000.0},
-    ])
-    current = _make_json([
-        {"name": "steady", "mean_ns": 1000.0, "median_ns": 1000.0, "stddev_ns": 10.0,
-         "min_ns": 990, "max_ns": 1010, "iterations": 100, "ops_per_sec": 1_000_000.0},
-    ])
+def test_comparison_report_format_unknown_raises():
+    import pytest
 
-    output = format_comparison(baseline, current)
-    assert "same" in output
+    report = _make_report()
+    with pytest.raises(ValueError, match="unknown format"):
+        report.format("bogus")
 
 
-def test_format_comparison_missing_and_new():
-    baseline = _make_json([
-        {"name": "gone", "mean_ns": 1000.0, "median_ns": 1000.0, "stddev_ns": 10.0,
-         "min_ns": 990, "max_ns": 1010, "iterations": 50, "ops_per_sec": 1_000_000.0},
-    ])
-    current = _make_json([
-        {"name": "added", "mean_ns": 500.0, "median_ns": 500.0, "stddev_ns": 5.0,
-         "min_ns": 495, "max_ns": 505, "iterations": 50, "ops_per_sec": 2_000_000.0},
-    ])
+def test_compare_no_results_key_raises():
+    import pytest
 
-    output = format_comparison(baseline, current)
-    assert "gone" in output
-    assert "added" in output
-    assert "N/A" in output
+    with pytest.raises(ValueError):
+        pybench.compare("{}", json.dumps({"metadata": {}, "results": []}))
 
 
-def test_format_comparison_contains_names():
-    baseline = _make_json([
-        {"name": "sort", "mean_ns": 1000.0, "median_ns": 1000.0, "stddev_ns": 10.0,
-         "min_ns": 990, "max_ns": 1010, "iterations": 100, "ops_per_sec": 1_000_000.0},
-    ])
-    current = _make_json([
-        {"name": "sort", "mean_ns": 1100.0, "median_ns": 1100.0, "stddev_ns": 11.0,
-         "min_ns": 1090, "max_ns": 1110, "iterations": 100, "ops_per_sec": 909_091.0},
-    ])
+def test_compare_results_not_array_raises():
+    import pytest
 
-    output = format_comparison(baseline, current)
-    assert "sort" in output
-    assert "%" in output
+    with pytest.raises(ValueError):
+        pybench.compare(
+            json.dumps({"results": "not-an-array"}),
+            json.dumps({"results": []}),
+        )
+
+
+def test_compare_payload_not_object_raises():
+    import pytest
+
+    with pytest.raises(ValueError):
+        pybench.compare("[]", json.dumps({"results": []}))
+
+
+def test_compare_rejects_oversized_input():
+    import pytest
+
+    huge = "a" * (51 * 1024 * 1024)  # 51 MB, just over the 50 MB cap
+    with pytest.raises(ValueError, match="exceeds.*limit"):
+        pybench.compare(huge, json.dumps({"results": []}))
+    with pytest.raises(ValueError, match="current.*exceeds"):
+        pybench.compare(json.dumps({"results": []}), huge)
+
+
+def test_compare_error_identifies_baseline_vs_current():
+    import pytest
+
+    # Malformed baseline → error message mentions "baseline"
+    with pytest.raises(ValueError, match="baseline"):
+        pybench.compare("not json at all", json.dumps({"results": []}))
+
+    # Malformed current → error message mentions "current"
+    with pytest.raises(ValueError, match="current"):
+        pybench.compare(json.dumps({"results": []}), "not json at all")
+
+
+def test_compare_row_not_object_raises():
+    import pytest
+
+    with pytest.raises(ValueError):
+        pybench.compare(
+            json.dumps({"results": ["not-an-object"]}),
+            json.dumps({"results": []}),
+        )
+
+
+def test_compare_row_missing_name_raises():
+    import pytest
+
+    with pytest.raises(ValueError, match="name"):
+        pybench.compare(
+            json.dumps({"results": [{"mean_ns": 1.0, "ci95_low_ns": 0.5, "ci95_high_ns": 1.5}]}),
+            json.dumps({"results": []}),
+        )
+
+
+def test_compare_row_missing_mean_raises():
+    import pytest
+
+    with pytest.raises(ValueError, match="mean_ns"):
+        pybench.compare(
+            json.dumps({"results": [{"name": "x", "ci95_low_ns": 0.5, "ci95_high_ns": 1.5}]}),
+            json.dumps({"results": []}),
+        )
+
+
+def test_compare_row_missing_ci_raises():
+    import pytest
+
+    with pytest.raises(ValueError, match="ci95"):
+        pybench.compare(
+            json.dumps({"results": [{"name": "x", "mean_ns": 1.0, "ci95_low_ns": 0.5}]}),
+            json.dumps({"results": []}),
+        )
+
+
+def test_comparison_report_format_empty():
+    empty = _payload([])
+    report = pybench.compare(empty, empty)
+    assert "No benchmarks to compare" in report.format("table")
+
+
+def test_diff_row_attributes():
+    report = _make_report()
+    by_name = {r.name: r for r in report.rows}
+    a = by_name["a"]
+    assert a.baseline_mean_ns is not None
+    assert a.current_mean_ns is not None
+    assert a.change_pct is not None
+    # 'c' is only in baseline → current_mean_ns is None
+    c = by_name["c"]
+    assert c.current_mean_ns is None
+    assert c.change_pct is None

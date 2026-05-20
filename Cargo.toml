@@ -1,0 +1,42 @@
+[package]
+name = "pybench"
+version = "1.0.0-alpha.1"
+edition = "2021"
+license = "MIT"
+description = "Lightweight Python microbenchmarking library — Rust core"
+
+[lib]
+name = "_pybench"
+# rlib lets the integration tests / criterion benches link against the crate's
+# public modules; cdylib is what maturin packages into the Python wheel.
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Default to NOT linking pyo3's extension-module, so `cargo test` and
+# `cargo bench` can link libpython normally. Maturin enables it via
+# pyproject.toml ([tool.maturin] features) when building the wheel.
+default = []
+extension-module = ["pyo3/extension-module"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["abi3-py310"] }
+hdrhistogram = "7"
+fastrand = "2"
+
+[dev-dependencies]
+criterion = { version = "0.8", features = ["html_reports"] }
+
+[[bench]]
+name = "rust_internals"
+harness = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+
+# `cargo bench` defaults to the `bench` profile, which inherits from `release`
+# but isn't always identical. Pin it explicitly so optimised builds and
+# benchmarks share the same codegen settings.
+[profile.bench]
+lto = "thin"
+codegen-units = 1

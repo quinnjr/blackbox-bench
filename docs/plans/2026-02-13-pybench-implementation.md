@@ -56,7 +56,7 @@ Create `tests/__init__.py` as empty file.
 
 **Step 3: Install in dev mode and verify**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && python -c "import pybench; print('ok')"`
+Run: `cd /home/joseph/Projects/pybench && python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]" && python -c "import pybench; print('ok')"`
 Expected: `ok`
 
 **Step 4: Commit**
@@ -127,7 +127,7 @@ def test_to_dict_roundtrip():
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_results.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_results.py -v`
 Expected: FAIL with `ModuleNotFoundError` or `ImportError`
 
 **Step 3: Write minimal implementation**
@@ -187,7 +187,7 @@ class BenchmarkResult:
 
 **Step 4: Run test to verify it passes**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_results.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_results.py -v`
 Expected: All 4 tests PASS
 
 **Step 5: Commit**
@@ -275,7 +275,7 @@ def test_run_respects_gc_disable():
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_runner.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_runner.py -v`
 Expected: FAIL with `ImportError`
 
 **Step 3: Write minimal implementation**
@@ -339,7 +339,7 @@ class Runner:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_runner.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_runner.py -v`
 Expected: All 4 tests PASS
 
 **Step 5: Commit**
@@ -444,7 +444,7 @@ def test_module_level_decorator():
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_bench.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_bench.py -v`
 Expected: FAIL with `ImportError`
 
 **Step 3: Write minimal implementation**
@@ -551,7 +551,7 @@ def benchmark(fn=None, /, *, warmup=None, iterations=None):
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_bench.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_bench.py -v`
 Expected: All 6 tests PASS
 
 **Step 5: Commit**
@@ -637,7 +637,7 @@ def test_format_json_is_valid_json():
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_reporter.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_reporter.py -v`
 Expected: FAIL with `ImportError`
 
 **Step 3: Write minimal implementation**
@@ -723,7 +723,7 @@ def format_json(results: list[BenchmarkResult]) -> str:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_reporter.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_reporter.py -v`
 Expected: All 7 tests PASS
 
 **Step 5: Commit**
@@ -820,7 +820,7 @@ def test_format_comparison_contains_names():
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_compare.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_compare.py -v`
 Expected: FAIL with `ImportError`
 
 **Step 3: Write minimal implementation**
@@ -926,7 +926,7 @@ def format_comparison(baseline_json: str, current_json: str) -> str:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_compare.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_compare.py -v`
 Expected: All 4 tests PASS
 
 **Step 5: Commit**
@@ -1039,7 +1039,7 @@ def test_cli_compare(tmp_path, capsys):
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_cli.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_cli.py -v`
 Expected: FAIL with `ImportError`
 
 **Step 3: Write minimal implementation**
@@ -1147,7 +1147,7 @@ def main() -> None:
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_cli.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_cli.py -v`
 Expected: All 4 tests PASS
 
 **Step 5: Commit**
@@ -1212,7 +1212,7 @@ def test_bench_to_json():
 
 **Step 2: Run tests to verify they fail**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_init.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_init.py -v`
 Expected: FAIL with `ImportError`
 
 **Step 3: Implement public API**
@@ -1254,12 +1254,12 @@ Add `report()` and `to_json()` to the `Bench` class in `src/pybench/bench.py`. A
 
 **Step 4: Run tests to verify they pass**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_init.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_init.py -v`
 Expected: All 3 tests PASS
 
 **Step 5: Run full test suite**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest -v`
 Expected: All tests PASS
 
 **Step 6: Commit**
@@ -1321,12 +1321,12 @@ def test_full_workflow():
 
 **Step 2: Run integration test**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest tests/test_integration.py -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest tests/test_integration.py -v`
 Expected: PASS
 
 **Step 3: Run full suite one final time**
 
-Run: `cd /home/joseph/Projects/PegasusHeavyIndustries/pybench && .venv/bin/pytest -v`
+Run: `cd /home/joseph/Projects/pybench && .venv/bin/pytest -v`
 Expected: All tests PASS
 
 **Step 4: Commit**
